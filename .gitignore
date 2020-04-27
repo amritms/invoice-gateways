@@ -1,0 +1,9 @@
+build
+composer.lock
+docs
+vendor
+coverage
+
+.vscode
+.history
+.DS_Store
