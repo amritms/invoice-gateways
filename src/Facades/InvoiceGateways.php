@@ -1,13 +1,13 @@
 <?php
 
-namespace Amritms\InvoiceGateways;
+namespace Amritms\InvoiceGateways\Facades;
 
 use Illuminate\Support\Facades\Facade;
 
 /**
  * @see \Amritms\InvoiceGateways\Skeleton\SkeletonClass
  */
-class InvoiceGatewaysFacade extends Facade
+class InvoiceGateways extends Facade
 {
     /**
      * Get the registered name of the component.

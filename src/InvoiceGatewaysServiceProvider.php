@@ -3,6 +3,10 @@
 namespace Amritms\InvoiceGateways;
 
 use Illuminate\Support\ServiceProvider;
+use Amritms\InvoiceGateways\InvoiceGateways;
+use Amritms\InvoiceGateway\Contracts\Invoice;
+use Amritms\InvoiceGateways\Repositories\Paypal;
+use Amritms\InvoiceGateways\Repositories\Freshbooks;
 
 class InvoiceGatewaysServiceProvider extends ServiceProvider
 {
@@ -55,6 +59,21 @@ class InvoiceGatewaysServiceProvider extends ServiceProvider
         // Register the main class to use with the facade
         $this->app->singleton('invoice-gateways', function () {
             return new InvoiceGateways;
+        });
+
+        $this->app->bind(Invoice::class, function ($app) {
+            switch(config('payments.payment_type')){
+                //in case of paypal
+                case 'paypal' : return new Paypal();
+                break;
+
+                //in case of stripe
+                case 'freshbooks' : return new Freshbooks();
+                break;
+
+                //default case
+                default : return new Paypal();
+            }            
         });
     }
 }
