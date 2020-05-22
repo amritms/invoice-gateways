@@ -38,7 +38,7 @@ class Paypal implements InvoiceContract
         $apiContext = $this->getApiContext($clientId, $clientSecret);
 
         $invoice = new Invoice();
-        
+
         $invoice
             ->setMerchantInfo(new MerchantInfo())
             ->setBillingInfo(array(new BillingInfo()))
@@ -146,7 +146,7 @@ class Paypal implements InvoiceContract
         try {
             $invoice->create($apiContext);
         } catch (Exception $ex) {
-            dd($e->getMessage());
+            dd($ex->getMessage());
             // ResultPrinter::printError('Create Invoice', 'Invoice', null, $request, $ex);
             exit(1);
         }
@@ -195,11 +195,11 @@ private function getApiContext($clientId, $clientSecret)
     // #### SDK configuration
     // Register the sdk_config.ini file in current directory
     // as the configuration source.
-    
+
     if(!defined("PP_CONFIG_PATH")) {
         define("PP_CONFIG_PATH", __DIR__);
     }
-    
+
 
 
     // ### Api context

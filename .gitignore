@@ -4,6 +4,7 @@ docs
 vendor
 coverage
 
+.idea
 .vscode
 .history
 .DS_Store

@@ -23,4 +23,9 @@ interface Invoice
      * Send invoice to the customer via email.
      */
     public function send();
+
+    /**
+     * Delete invoice
+     */
+    public function delete();
 }

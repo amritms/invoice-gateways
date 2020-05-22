@@ -2,6 +2,7 @@
 
 namespace Amritms\InvoiceGateways;
 
+use Amritms\WaveappsClientPhp\Waveapps;
 use Illuminate\Support\ServiceProvider;
 use Amritms\InvoiceGateways\InvoiceGateways;
 use Amritms\InvoiceGateway\Contracts\Invoice;
@@ -67,13 +68,16 @@ class InvoiceGatewaysServiceProvider extends ServiceProvider
                 case 'paypal' : return new Paypal();
                 break;
 
+                case 'waveapps' : return new Waveapps();
+                break;
+
                 //in case of stripe
                 case 'freshbooks' : return new Freshbooks();
                 break;
 
                 //default case
                 default : return new Paypal();
-            }            
+            }
         });
     }
 }

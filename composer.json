@@ -18,7 +18,8 @@
     "require": {
         "php": "^7.2",
         "illuminate/support": "^7.0",
-        "paypal/rest-api-sdk-php": "^1.14"
+        "paypal/rest-api-sdk-php": "^1.14",
+        "amritms/waveapps-client-php": "dev-master"
     },
     "require-dev": {
         "orchestra/testbench": "^5.0",
@@ -51,5 +52,9 @@
                 "InvoiceGateways": "Amritms\\InvoiceGateways\\Facades\\InvoiceGateways"
             }
         }
-    }
+    },
+    "repositories": [{
+        "type": "path",
+        "url": "../waveapps-client-php"
+    }]
 }
