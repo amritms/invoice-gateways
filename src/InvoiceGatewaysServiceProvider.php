@@ -2,12 +2,14 @@
 
 namespace Amritms\InvoiceGateways;
 
-use Amritms\WaveappsClientPhp\Waveapps;
 use Illuminate\Support\ServiceProvider;
-use Amritms\InvoiceGateways\InvoiceGateways;
-use Amritms\InvoiceGateway\Contracts\Invoice;
+//use Amritms\WaveappsClientPhp\Waveapps;
+use Amritms\InvoiceGateways\Contracts\Invoice;
+use Amritms\InvoiceGateways\Contracts\Authorize;
+use Amritms\InvoiceGateways\Repositories\Waveapps;
 use Amritms\InvoiceGateways\Repositories\Paypal;
 use Amritms\InvoiceGateways\Repositories\Freshbooks;
+use Amritms\InvoiceGateways\Repositories\AuthorizeWaveapps;
 
 class InvoiceGatewaysServiceProvider extends ServiceProvider
 {
@@ -22,7 +24,8 @@ class InvoiceGatewaysServiceProvider extends ServiceProvider
         // $this->loadTranslationsFrom(__DIR__.'/../resources/lang', 'invoice-gateways');
         // $this->loadViewsFrom(__DIR__.'/../resources/views', 'invoice-gateways');
         // $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
-        // $this->loadRoutesFrom(__DIR__.'/routes.php');
+        $this->loadRoutesFrom(__DIR__.'/../routes/routes.php');
+
 
         if ($this->app->runningInConsole()) {
             $this->publishes([
@@ -46,7 +49,10 @@ class InvoiceGatewaysServiceProvider extends ServiceProvider
 
             // Registering package commands.
             // $this->commands([]);
+
+
         }
+
     }
 
     /**
@@ -54,30 +60,65 @@ class InvoiceGatewaysServiceProvider extends ServiceProvider
      */
     public function register()
     {
+//        $request = app(\Illuminate\Http\Request::class);
+//        $request = resolve(\Illuminate\Http\Request::class);
+
         // Automatically apply the package configuration
         $this->mergeConfigFrom(__DIR__.'/../config/config.php', 'invoice-gateways');
 
-        // Register the main class to use with the facade
-        $this->app->singleton('invoice-gateways', function () {
-            return new InvoiceGateways;
+        $invoice_type = $this->app->request->get('invoice_type');
+
+        $invoice_type = isset($invoice_type) ? $invoice_type :  config('invoice-gateways.payment_type');
+
+        $this->app->bind(Invoice::class, function ($app) use($invoice_type){
+
+            return $this->resolveInvoice($invoice_type);
         });
 
-        $this->app->bind(Invoice::class, function ($app) {
-            switch(config('payments.payment_type')){
+
+
+        $this->app->bind(Authorize::class, function ($app) use($invoice_type){
+            switch($invoice_type){
                 //in case of paypal
-                case 'paypal' : return new Paypal();
-                break;
+                case 'paypal' : return new AuthorizePaypal();
+                    break;
 
-                case 'waveapps' : return new Waveapps();
-                break;
+                case 'waveapps' : return new AuthorizeWaveapps(config('invoice-gateways.waveapps'));
+                    break;
 
-                //in case of stripe
-                case 'freshbooks' : return new Freshbooks();
-                break;
+                //in case of freshbooks
+                case 'freshbooks' : return new AuthorizeFreshbooks();
+                    break;
+
+                //in case of quickbooks
+                case 'quickbooks' : return new AuthorizeQuickbooks();
+                    break;
 
                 //default case
-                default : return new Paypal();
+//                default : return new Paypal();
             }
         });
+    }
+
+    private function resolveInvoice($invoice_type){
+        switch($invoice_type){
+            //in case of paypal
+            case 'paypal' : return new Paypal();
+                break;
+
+            case 'waveapps' : return new Waveapps(null, null, null, config('invoice-gateways.waveapps'));
+                break;
+
+            //in case of freshbooks
+            case 'freshbooks' : return new Freshbooks();
+                break;
+
+            //in case of quickbooks
+            case 'quickbooks' : return new Quickbooks();
+                break;
+
+            //default case
+//                default : return new Paypal();
+        }
     }
 }

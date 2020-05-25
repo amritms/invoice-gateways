@@ -158,7 +158,7 @@ class Paypal implements InvoiceContract
     /**
      * Get Draft Invoice for edit.
      */
-    public function getDraft()
+    public function getDraftInvoice()
     {
     }
 

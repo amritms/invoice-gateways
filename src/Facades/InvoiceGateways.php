@@ -2,6 +2,7 @@
 
 namespace Amritms\InvoiceGateways\Facades;
 
+use Amritms\InvoiceGateways\Contracts\Invoice;
 use Illuminate\Support\Facades\Facade;
 
 /**
@@ -16,6 +17,6 @@ class InvoiceGateways extends Facade
      */
     protected static function getFacadeAccessor()
     {
-        return 'invoice-gateways';
+        return Invoice::class;
     }
 }

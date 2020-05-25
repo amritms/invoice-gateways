@@ -5,7 +5,8 @@
  */
 return [
 	// possible options: paypal, freshbooks, quickbooks, wave
-    'payment_type' => env('PAYMENT_TYPE', 'paypal'),
+    'payment_type' => env('PAYMENT_TYPE', 'waveapps'),
+    'supported_invoice_types' => env('SUPPORTED_INVOICE_TYPES', 'waveapps'),
     'paypal' => [
         # Define your application mode here
 	    'mode' => env('PAYPAL_MODE', 'sandbox'),  //"sanbox" for testing and "live" for production
@@ -44,8 +45,10 @@ return [
         'client_id' => env('WAVE_CLIENT_ID'),
         'client_secret' => env('WAVE_CLIENT_SECRET'),
         'graphql_auth_uri' => env('WAVE_GRAPHQL_AUTH_URI', 'https://api.waveapps.com/oauth2/token/'),
+        'graphql_auth_redirect_uri' => env('WAVE_GRAPHQL_AUTH_REDIRECT_URI', '/invoice-gateways/call-back'),
         'graphql_uri' => env('WAVE_GRAPHQL_URI', 'https://gql.waveapps.com/graphql/public'),
-        'business_id' => env('WAVE_BUSINESS_ID', null),
+        'businessId' => env('WAVE_BUSINESS_ID', null),
+        'granted_permissions' => env('WAVE_GRANTED_PERMISSIONS', 'account:* business:read customer:* invoice:* product:* user:read'),
         'access_token' => null,
         'refresh_token' => null
     ]
