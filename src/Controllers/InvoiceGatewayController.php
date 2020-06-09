@@ -4,6 +4,7 @@ namespace Amritms\InvoiceGateways\Controllers;
 
 use Illuminate\Http\Request;
 use Amritms\InvoiceGateways\Contracts\Invoice;
+use Illuminate\Support\Facades\Auth;
 
 class InvoiceGatewayController implements Invoice
 {
@@ -36,5 +37,14 @@ class InvoiceGatewayController implements Invoice
     public function delete($input = [])
     {
         return $this->invoice->delete($input);
+    }
+
+    public function createCustomer($input = []){}
+
+    public function createProduct($input = []){}
+
+    public function getAllInvoices()
+    {
+        return $this->invoice->getAllInvoices();
     }
 }

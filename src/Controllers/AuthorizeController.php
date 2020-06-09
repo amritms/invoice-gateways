@@ -22,4 +22,9 @@ class AuthorizeController implements Authorize
     {
         return $this->authorize->callback();
     }
+
+    public function refreshToken()
+    {
+        return $this->authorize->refreshToken();
+    }
 }

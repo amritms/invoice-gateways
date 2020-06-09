@@ -9,7 +9,7 @@ Route::get('invoice-gateways/call-back', [AuthorizeController::class, 'callback'
 //Route::get('invoice-gateways/create-invoice-form', 'InvoiceGatewayController@createInvoiceForm');
 Route::post('invoice-gateways/create-invoice', [InvoiceGatewayController::class, 'create']);
 //Route::post('invoice-gateways/create-invoice', 'InvoiceGatewayController@createInvoice');
-//Route::get('invoice-gateways/get-all-invoices', 'InvoiceGatewayController@getAllInvoices');
+Route::get('invoice-gateways/get-all-invoices', [InvoiceGatewayController::class,'getAllInvoices']);
 //Route::get('invoice-gateways/get-all-customers', 'InvoiceGatewayController@getAllCustomers');
 //Route::get('invoice-gateways/get-all-products', 'InvoiceGatewayController@getAllProducts');
 //Route::get('invoice-gateways/get-accountid', 'InvoiceGatewayController@getAccountId');

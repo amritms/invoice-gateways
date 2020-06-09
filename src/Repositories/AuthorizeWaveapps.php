@@ -32,6 +32,8 @@ class AuthorizeWaveapps implements Authorize
                 '&scope=' . $this->config['granted_permissions'].
                 '&state='. $this->config['state'];
 
+            session(['job_url_before_redirect' => url()->previous()]);
+
             return redirect($url);
             } catch (\Exception $e){
                 session()->flash('error', 'Couldn\'t connect with waveapps, Please contact info@voiceoverview.com with full details.');
@@ -93,11 +95,13 @@ class AuthorizeWaveapps implements Authorize
         ];
         (new InvoiceGatewayModel)->updateOrCreate(['user_id' => $user_id], $invoice_configs);
 
-
         \Log::debug('Application verified successfully for user::' . $user_id, ['_trace' => $response]);
         request()->session()->flash('message', 'Application verified successfully, you can proceed with wave invoice creation.');
 
-        return redirect('/');
+        $job_url_before_redirect = session('job_url_before_redirect');
+        session()->forget('job_url_before_redirect');
+
+        return redirect($job_url_before_redirect ?? url('job'));
     }
 
     /**
@@ -110,10 +114,12 @@ class AuthorizeWaveapps implements Authorize
             return redirect(url('/'));
         }
 
-        $response = HTTP::asForm()->post('https://api.waveapps.com/oauth2/token/', [
+        $config = InvoiceGatewayModel::where('user_id', \Auth::user()->id)->first();
+
+;        $response = HTTP::asForm()->post('https://api.waveapps.com/oauth2/token/', [
             'client_id' => $this->config['client_id'],
             'client_secret' => $this->config['client_secret'],
-            'refresh_token' => $this->config['refresh_token'],
+            'refresh_token' => $config['config']['refresh_token'],
             'grant_type' => 'refresh_token',
             'redirect_uri' => $this->config['graphql_auth_redirect_uri'],
         ]);
@@ -124,8 +130,9 @@ class AuthorizeWaveapps implements Authorize
         }
 
         $response = $response->json();
-        session(['access_token' => $response['access_token']]);
-        session(['expires_in' => now()->addSeconds($response['expires_in'])]);
+
+        config(['invoice-gateways.waveapps.access_token' => $response['access_token']]);
+        config(['invoice-gateways.waveapps.expires_in' => now()->addSeconds($response['expires_in'])]);
         config(['invoice-gateways.waveapps.access_token' => $response['access_token']]);
 
         \Log::debug('Token refreshed successfully for user_id:' . auth()->id());
