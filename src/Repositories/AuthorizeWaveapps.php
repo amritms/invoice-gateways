@@ -35,18 +35,19 @@ class AuthorizeWaveapps implements Authorize
             session(['job_url_before_redirect' => url()->previous()]);
 
             return redirect($url);
-            } catch (\Exception $e){
-                session()->flash('error', 'Couldn\'t connect with waveapps, Please contact info@voiceoverview.com with full details.');
 
-                \Log::error($e->getMessage(),[
-                    '_user_id' => auth()->id(),
-                    'url' => \Request::fullUrl() ?? '',
-                    'method' => \Route::getCurrentRoute()->getActionName() ?? '',
-                    '__trace' => $e->getTraceAsString()
-                ]);
+        } catch (\Exception $e){
+            session()->flash('error', 'Couldn\'t connect with waveapps, Please contact info@voiceoverview.com with full details.');
 
-                return redirect()->back();
-            }
+            \Log::error($e->getMessage(),[
+                '_user_id' => auth()->id(),
+                'url' => \Request::fullUrl() ?? '',
+                'method' => \Route::getCurrentRoute()->getActionName() ?? '',
+                '__trace' => $e->getTraceAsString()
+            ]);
+
+            return redirect()->back();
+        }
     }
 
     /**
@@ -90,16 +91,17 @@ class AuthorizeWaveapps implements Authorize
             'invoice_type' => 'waveapps',
             'config' => [
                 "businessId" => $response['businessId'],
-                "refresh_token" => $response['refresh_token']
+                "refresh_token" => $response['refresh_token'],
+                "access_token" => $response['access_token'],
+                "expires_in" => now()->addSeconds($response['expires_in'])
             ]
         ];
         (new InvoiceGatewayModel)->updateOrCreate(['user_id' => $user_id], $invoice_configs);
 
         \Log::debug('Application verified successfully for user::' . $user_id, ['_trace' => $response]);
-        request()->session()->flash('message', 'Application verified successfully, you can proceed with wave invoice creation.');
+        flash('Application verified successfully.')->success();
 
-        $job_url_before_redirect = session('job_url_before_redirect');
-        session()->forget('job_url_before_redirect');
+        $job_url_before_redirect = session()->pull('job_url_before_redirect');
 
         return redirect($job_url_before_redirect ?? url('job'));
     }
@@ -116,7 +118,7 @@ class AuthorizeWaveapps implements Authorize
 
         $config = InvoiceGatewayModel::where('user_id', \Auth::user()->id)->first();
 
-;        $response = HTTP::asForm()->post('https://api.waveapps.com/oauth2/token/', [
+        $response = HTTP::asForm()->post('https://api.waveapps.com/oauth2/token/', [
             'client_id' => $this->config['client_id'],
             'client_secret' => $this->config['client_secret'],
             'refresh_token' => $config['config']['refresh_token'],
@@ -125,15 +127,22 @@ class AuthorizeWaveapps implements Authorize
         ]);
 
         // refresh token is stored indefinitely, if waveaps returns unauthorized(401) status code, then redirect user to get access token.
-        if($response->status() == 401){
-            return redirect(url('invoice-gateways/get-access-token'));
+        if(in_array($response->status(), [400, 401])){
+            \Redirect::to(route('invoce-gateways.authorize'))->send();
         }
 
         $response = $response->json();
-
         config(['invoice-gateways.waveapps.access_token' => $response['access_token']]);
         config(['invoice-gateways.waveapps.expires_in' => now()->addSeconds($response['expires_in'])]);
-        config(['invoice-gateways.waveapps.access_token' => $response['access_token']]);
+
+        InvoiceGatewayModel::where('user_id', \Auth::user()->id)->update([
+            'config' => [
+                "businessId" => $response['businessId'],
+                "refresh_token" => $response['refresh_token'],
+                "access_token" => $response['access_token'],
+                "expires_in" => now()->addSeconds($response['expires_in'])
+            ]
+        ]);
 
         \Log::debug('Token refreshed successfully for user_id:' . auth()->id());
     }

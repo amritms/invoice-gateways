@@ -29,7 +29,7 @@ composer test
 
 ### Changelog
 **Invoices_configs table has a row for each user:**
-```config {"businessId":"","refresh_token":"","incomeAccountId":""}```
+```config {"businessId":"","refresh_token":"","access_token":"","expires_in":"","incomeAccountId":""}```
 
 Please see [CHANGELOG](CHANGELOG.md) for more information what has changed recently.
 

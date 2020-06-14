@@ -2,17 +2,14 @@
 
 namespace Amritms\InvoiceGateways\Repositories;
 
-use Amritms\InvoiceGateways\Models\Contact;
+use Amritms\InvoiceGateways\Exceptions\FailedException;
+use Amritms\InvoiceGateways\Exceptions\InvalidConfiguration;
+use Amritms\InvoiceGateways\Exceptions\UnauthenticatedException;
 use Amritms\InvoiceGateways\Models\InvoiceGateway as InvoiceGatewayModel;
-use Amritms\InvoiceGateways\Models\JobInvoice;
-use App\Job;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Http;
 use Amritms\InvoiceGateways\Contracts\Invoice as InvoiceContract;
-use Amritms\InvoiceGateways\Models\InvoiceGateway as InvoicesGatewayModel;
 
 class Waveapps implements InvoiceContract
 {
@@ -35,13 +32,14 @@ class Waveapps implements InvoiceContract
     {
         $this->client_id = $config['client_id'];
         if (empty($this->client_id)) {
-            throw new Exception("Please provide wave app's client id", 400);
+            throw InvalidConfiguration::ClientIdNotSpecified();
         }
 
         $this->client_secret = $config['client_secret'];
         if (empty($this->client_secret)) {
-            throw new Exception("Please provide wave app's client secret", 400);
+            throw InvalidConfiguration::ClientSecretNotSpecified();
         }
+
         $this->user_id = Auth::id();
         $this->populateConfigFromDb();
 
@@ -49,16 +47,11 @@ class Waveapps implements InvoiceContract
         $this->state = 'csrf_protection_' . $this->user_id;
         $config = config('invoice-gateways.waveapps');
 
-        if (empty($config['access_token'])  || ! empty($config['expires_in']) && now()->lessThan($config['expires_in'])){
+        if ($config['access_token'] == null || (! empty($config['expires_in']) && now()->greaterThanOrEqualTo($config['expires_in']))){
             (new AuthorizeWaveapps($config))->refreshToken();
         }
 
         $this->waveapps = new \Amritms\WaveappsClientPhp\Waveapps(null, null, null, config('invoice-gateways.waveapps'));
-    }
-
-    public function index()
-    {
-        return view('welcome');
     }
 
     /**
@@ -82,38 +75,6 @@ class Waveapps implements InvoiceContract
         }
 
         return ['success' => true, 'data' => $response];
-    }
-
-    /**
-     * Let user select product and customer to create invoice
-     * @return \Illuminate\Contracts\Foundation\Application|\Illuminate\Contracts\View\Factory|\Illuminate\View\View|string
-     */
-    public function createInvoiceForm(){
-        $customers_result = $this->getAllCustomers();
-        $products_result = $this->getAllProducts();
-
-        if(! $customers_result['success'] || !$products_result['success']){
-            return ('Make sure you have products and customers');
-        }
-
-        $customers = $customers_result['body'];
-        $products = $products_result['body'];
-
-        return view('invoices.waveapps.create_invoice', compact('customers', 'products'));
-    }
-
-    /**
-     * Create invoice from data of current job.
-     * @return array
-     */
-    public function createDraftInvoice(){
-        $customer = $this->createCustomer();
-        $product = $this->createProduct();
-
-        $output['customer_id'] = $customer['id'];
-        $output['product_id'] = $product['id'];
-
-        return $this->createInvoice($output);
     }
 
     /**
@@ -323,8 +284,9 @@ class Waveapps implements InvoiceContract
 
         if(isset($response['errors'][0]['extensions']['code']) && $response['errors'][0]['extensions']['code'] ==  "UNAUTHENTICATED"){
             \Log::debug('Couldn\'t create customer for creating invoice for user_id:' . $this->user_id, ['_trace' => $response]);
+            (new AuthorizeWaveapps( config('invoice-gateways.waveapps')))->refreshToken();
 
-            return ['success' => false, 'message' => 'UNAUTHENTICATED', 'data' => $response];
+            throw UnauthenticatedException::forCustomercreate();
         }
 
         if(isset($response['data']['customerCreate']['didSucceed']) && $response['data']['customerCreate']['didSucceed'] == true){
@@ -336,7 +298,7 @@ class Waveapps implements InvoiceContract
 
         \Log::error('Couldn\'t create waveapps customer for creating invoice for user_id:' . $this->user_id, ['_trace' => $response]);
 
-        return ['success' => false, 'data' => $response];
+        throw FailedException::forCustomerCreate();
        }
 
     /**
@@ -360,42 +322,19 @@ class Waveapps implements InvoiceContract
 
         $response = $this->waveapps->productCreate($variables, 'ProductCreateInput');
 
-        if(isset($response['errors'])){
+        if(isset($response['errors'][0]['extensions']['code']) && $response['errors'][0]['extensions']['code'] ==  "UNAUTHENTICATED"){
+            \Log::debug('Couldn\'t create product for creating invoice for user_id:' . $this->user_id, ['_trace' => $response]);
+            (new AuthorizeWaveapps( config('invoice-gateways.waveapps')))->refreshToken();
+        }
+        elseif(isset($response['errors'])){
             \Log::error('couldn\'t create waveapps product for user_id: ' . $this->user_id, ['_trace' => $response]);
 
-            return response()->json(['success' => false, 'data' => $response])->status(400);
+            throw FailedException::forProductCreate();
         }
 
         \Log::debug('waveapps Product created successfully for user_id:' . $this->user_id, ['_trace' => $response]);
 
         return ['id' => $response['data']['productCreate']['product']['id'], 'name' => $response['data']['productCreate']['product']['name']];
-    }
-
-    /**
-     * Draft invoices can not be sent as emails. So need to approve it first.
-     * It can be fired multiple times, don't throw error even if the invoice is already active.
-     * @param $invoice_id
-     * @return array
-     */
-    public function approveInvoice($invoice_id)
-    {
-        $variables = [
-            'input' => [
-                "invoiceId" => $invoice_id
-            ]
-        ];
-
-        $response = $this->waveapps->invoiceApprove($variables, 'InvoiceApproveInput');
-
-        if(isset($response['data']['invoiceApprove']['didSucceed']) && $response['data']['invoiceApprove']['didSucceed']){
-            request()->session()->flash('message', 'Invoice approved successfully.');
-            \Log::debug('Waveapps Invoice approved successfully for user_id:' . $this->user_id);
-
-            return ['success' => true, 'message' => 'Invoice successfully approved.', 'data' => $response];
-        }
-
-        \Log::error('couldn\'t approve waveapps invoice', ['_trace' => $response]);
-        return ['success' => false, 'message' => 'couldn\'t approve invoice', 'data' => $response];
     }
 
     /**
@@ -406,12 +345,6 @@ class Waveapps implements InvoiceContract
      */
     public function send($input = [])
     {
-        $approved_invoice = $this->approveInvoice($input['invoice_id']);
-
-        if(! isset($approved_invoice['success']) || $approved_invoice['success'] !== true){
-            return 'can\'t approve invoice. And unapproved invoice cannot be sent.';
-        }
-
         $input = [
             "invoiceId" => $input['invoice_id'],
             "to" => $input['email'],
@@ -427,18 +360,29 @@ class Waveapps implements InvoiceContract
             \Log::debug('Waveapps Invoice sent successfully for user_id:' . $this->user_id);
             request()->session()->flash('message', 'Invoice sent successfully.');
 
-            return ['success' => true, 'data' => $response];
+            return response( ['success' => true, 'data' => $response], 200);
+        }
+
+        if(isset($response['errors'][0]['extensions']['code']) && $response['errors'][0]['extensions']['code'] == 'UNAUTHENTICATED'){
+            (new AuthorizeWaveapps( config('invoice-gateways.waveapps')))->refreshToken();
+            request()->session()->flash('message', 'Something went wrong, Invoice couldn\'t be sent. Try again');
+            \Log::error('Try again. Something went wrong while sending waveapps invoice for user_id: ' . $this->user_id, ['_trace' => $response]);
+
+            throw UnauthenticatedException::forInvoiceSend();
         }
 
         request()->session()->flash('message', 'Something went wrong, Invoice couldn\'t be sent');
         \Log::error('Something went wrong while sending waveapps invoice for user_id: ' . $this->user_id, ['_trace' => $response]);
 
-        return ['success' => false, 'data' => $response];
+        throw FailedException::forInvoiceSend();
     }
 
-    public function delete($new_invoice = [])
+    public function delete($input = [])
     {
-        $variables = ['input' => ['invoiceId' => $this->invoice_id]];
+        if(!isset($input['invoice_id'])){
+            throw InvalidConfiguration::InvoiceIdNotSpecified("Please provide Invoice ID");
+        }
+        $variables = ['input' => ['invoiceId' => $input['invoice_id']]];
 
         $response = $this->waveapps->invoiceDelete($variables, 'InvoiceDeleteInput');
 
@@ -450,31 +394,39 @@ class Waveapps implements InvoiceContract
             return ['success' => true, 'data' => $response];
         }
 
-        request()->session()->flash('message', 'Something went wrong, Invoice couldn\'t be deleted');
+        request()->session()->flash('message', 'Something went wrong, Couldn\'t delete invoice.');
         \Log::error('Something went wrong while deleting waveapps invoice for user_id: ' . $this->user_id, ['_trace' => $response]);
 
-        return ['success' => false, 'data' => $response];
+        throw FailedException::forInvoiceDelete();
     }
 
     public function createAndSend($input = [])
     {
 
     }
+
     public function update($input = [])
     {
         // TODO: Implement update() method.
     }
 
+    /**
+     * fetch waveapps config from table and populate config.
+     */
     private function populateConfigFromDb()
     {
         $config = InvoiceGatewayModel::where('user_id', $this->user_id)->select('config')->firstOrFail();
 
-        $this->businessId = $config['config']['businessId'] ?? '';
-        $this->refresh_token = $config['config']['refresh_token'] ?? '';
-        $this->incomeAccountId = $config['config']['incomeAccountId'] ?? '';
+        $this->businessId      = $config['config']['businessId'] ?? null;
+        $this->refresh_token   = $config['config']['refresh_token'] ?? null;
+        $this->incomeAccountId = $config['config']['incomeAccountId'] ?? null;
+        $this->access_token    = $config['config']['access_token'] ?? null;
+        $this->expires_in      = $config['config']['expires_in'] ?? null;
 
         config(['invoice-gateways.waveapps.businessId' => $this->businessId]);
         config(['invoice-gateways.waveapps.refresh_token' => $this->refresh_token]);
         config(['invoice-gateways.waveapps.incomeAccountId' => $this->incomeAccountId]);
+        config(['invoice-gateways.waveapps.access_token' => $this->access_token]);
+        config(['invoice-gateways.waveapps.expires_in' => $this->expires_in]);
     }
 }
