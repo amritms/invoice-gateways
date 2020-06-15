@@ -12,6 +12,8 @@ Class InvoiceGateway extends Model
     protected $casts = [
         'user_id' => 'integer',
         'invoice_type' => 'string',
-        'config' => 'array'
+        'config' => 'array',
+        'contact_sync_at' => 'timestamp',
+        'dont_sync' => 'boolean'
     ];
 }

@@ -11,7 +11,12 @@ class UnauthenticatedException extends HttpException
         return new static($status_code, $message ?? 'Something went wrong, Couldn\'t create invoice. Try again',null, [], $status_code);
     }
 
-    public static function forCustomercreate($message = null, $status_code = 401)
+    public static function forCustomerCreate($message = null, $status_code = 401)
+    {
+        return new static($status_code, $message ?? 'Something went wrong, Couldn\'t create customer', null, [], $status_code);
+    }
+
+    public static function forCustomerAll($message = null, $status_code = 401)
     {
         return new static($status_code, $message ?? 'Something went wrong, Couldn\'t create customer', null, [], $status_code);
     }

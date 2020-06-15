@@ -43,8 +43,8 @@ class InvoiceGatewayController implements Invoice
 
     public function createProduct($input = []){}
 
-    public function getAllInvoices()
+    public function syncContacts()
     {
-        return $this->invoice->getAllInvoices();
+        return $this->invoice->syncContacts();
     }
 }

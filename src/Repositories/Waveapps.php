@@ -5,6 +5,7 @@ namespace Amritms\InvoiceGateways\Repositories;
 use Amritms\InvoiceGateways\Exceptions\FailedException;
 use Amritms\InvoiceGateways\Exceptions\InvalidConfiguration;
 use Amritms\InvoiceGateways\Exceptions\UnauthenticatedException;
+use Amritms\InvoiceGateways\Models\Contact;
 use Amritms\InvoiceGateways\Models\InvoiceGateway as InvoiceGatewayModel;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -112,8 +113,11 @@ class Waveapps implements InvoiceContract
         }
 
         \Log::error('couldn\'t create waveapps invoice. user_id:' . $this->user_id, ['data' => $response]);
-
-        return ['success' => false, 'message' => 'Couldn\'t create invoice', 'data' => $response];
+        if(isset($response['data']['invoiceCreate']['inputErrors'][0]['message'])){
+            $code = $response['data']['invoiceCreate']['inputErrors'][0]['code'] ?? $response['data']['invoiceCreate']['inputErrors'][0]['code'] == 'INVALID' ? 422 : 400;
+            throw FailedException::forInvoiceCreate($response['data']['invoiceCreate']['inputErrors'][0]['message'], $code);
+        }
+        throw FailedException::forInvoiceCreate();
     }
 
     /**
@@ -121,7 +125,7 @@ class Waveapps implements InvoiceContract
      * https://developer.waveapps.com/hc/en-us/articles/360032908311-Query-List-and-sort-customers
      * @return array|string
      */
-    public function getAllCustomers()
+    private function getAllCustomers()
     {
         $variables = [
             "businessId" => $this->businessId
@@ -131,25 +135,60 @@ class Waveapps implements InvoiceContract
 
         if(isset($response['errors'][0]['extensions']['code']) && $response['errors'][0]['extensions']['code'] ==  "UNAUTHENTICATED"){
             \Log::debug('Couldn\'t list waveapps customers for user_id:' . $this->user_id, ['_trace' => $response]);
+            (new AuthorizeWaveapps( config('invoice-gateways.waveapps')))->refreshToken();
 
-            return ['success' => false, 'message' => 'UNAUTHENTICATED', 'data' => $response];
+            throw UnauthenticatedException::forCustomerAll();
         }
 
         if(isset($response['data']['business']['customers']) && $response['data']['business']['customers'] !== null){
-            request()->session()->flash('message', 'product created successfully.');
             \Log::debug('Customer listed waveapps successfully for user_id:' . $this->user_id, ['_trace' => $response]);
 
             $return_result = [];
-            foreach($response['data']['business']['customers']['edges'] as $product){
-                $return_result[] = ['id' => $product['node']['id'], 'name' => $product['node']['name']];
+            foreach($response['data']['business']['customers']['edges'] as $customer){
+                $return_result[] = [
+                    'id' => $customer['node']['id'],
+                    'name' => $customer['node']['name'],
+                    'email' => $customer['node']['email']
+                ];
             }
 
             return ['success' => true, 'data' => $return_result];
         }
 
-        return ['success' => false, 'data' => $response];
+        \Log::debug('Couldn\'t list waveapps customers for user_id:' . $this->user_id, ['_trace' => $response]);
+
+        throw FailedException::forCustomerAll();
     }
 
+    /**
+     * Sync remote customers with your contact comparing email address.
+     * @return array
+     */
+    public function syncCustomers()
+    {
+        try{
+        $customers                   = $this->getAllCustomers();
+        $customers                   = collect($customers['data'])->unique('email');
+        $emails                      = $customers->pluck('email');
+        $customers_email_id_key_pair = $customers->mapWithKeys(function ($customer) {
+            return [$customer['email'] => $customer['id']];
+        });
+
+        $contacts = Contact::whereIn('email', $emails)->where('user_id', \Auth::id())->get();
+
+        $contacts->map(function ($contact) use ($customers_email_id_key_pair) {
+            $contact->customer_id = $customers_email_id_key_pair[$contact->email];
+            $contact->save();
+            return true;
+        });
+
+        (new InvoiceGatewayModel)->where(['user_id' => \Auth::id()])->update(['contact_sync_at' => now()]);
+
+        return ['success' => true, 'data' => $contacts];
+    }catch (\Exception $exception){
+            throw FailedException::forCustomerSync($exception->getMessage());
+        }
+    }
     /**
      * Get all products
      * https://developer.waveapps.com/hc/en-us/articles/360032572872-Query-Paginate-list-of-products
@@ -286,7 +325,7 @@ class Waveapps implements InvoiceContract
             \Log::debug('Couldn\'t create customer for creating invoice for user_id:' . $this->user_id, ['_trace' => $response]);
             (new AuthorizeWaveapps( config('invoice-gateways.waveapps')))->refreshToken();
 
-            throw UnauthenticatedException::forCustomercreate();
+            throw UnauthenticatedException::forCustomerCreate();
         }
 
         if(isset($response['data']['customerCreate']['didSucceed']) && $response['data']['customerCreate']['didSucceed'] == true){

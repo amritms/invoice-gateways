@@ -16,6 +16,16 @@ class FailedException extends HttpException
         return new static($status_code, $message ?? 'couldn\'t create customer.');
     }
 
+    public static function forCustomerAll($message = null, $status_code = 400)
+    {
+        return new static($status_code, $message ?? 'couldn\'t list customer.');
+    }
+
+    public static function forCustomerSync($message = null, $status_code = 400)
+    {
+        return new static($status_code, $message ?? 'couldn\'t sync customers.');
+    }
+
     public static function forInvoiceCreate($message = null, $status_code = 400)
     {
         return new static($status_code, $message ?? 'Something went wrong, Couldn\'t create invoice.');
