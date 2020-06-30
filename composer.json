@@ -21,7 +21,7 @@
         "illuminate/support": "^7.0",
         "illuminate/database": "^6.18|^7.0",
         "paypal/rest-api-sdk-php": "^1.14",
-        "amritms/waveapps-client-php": "0.1"
+        "amritms/waveapps-client-php": "^0.2"
     },
     "require-dev": {
         "orchestra/testbench": "^5.0",
