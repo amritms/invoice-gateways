@@ -60,7 +60,10 @@ class AuthorizeWaveapps implements Authorize
         if(! request('code')){
             \Log::error('something went wrong, waveapps didn\'t return code', ['_trace' => request()->json()]);
 
-            return 'something went wrong, waveapps didn\'t return code.';
+            flash('something went wrong, waveapps didn\'t return code.')->error();
+            $job_url_before_redirect = session()->pull('job_url_before_redirect');
+    
+            return redirect($job_url_before_redirect ?? url('job'));
         }
 
         // 2.1 Exchange auth code for tokens
@@ -76,7 +79,10 @@ class AuthorizeWaveapps implements Authorize
         if( $response->status() != 200){
             \Log::error('something went wrong, could\'t verify application', ['_trace' => request()->json()]);
 
-            return 'something went wrong, could\'t verify application';
+            flash('something went wrong, could\'t verify application')->error();
+            $job_url_before_redirect = session()->pull('job_url_before_redirect');
+    
+            return redirect($job_url_before_redirect ?? url('job'));
         }
 
         $response = $response->json();
