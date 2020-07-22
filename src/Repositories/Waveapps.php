@@ -93,8 +93,6 @@ class Waveapps implements InvoiceContract
             "businessId" => $this->businessId,
             "customerId" => $customer_id,
             "status" => $input['invoice_create_status'] ?? 'SAVED',
-            "memo" => $input['memo'] ?? '',
-            "footer" => $input['footer'] ?? '',
             "items" => [
                 'productId' => $product_id
             ],
