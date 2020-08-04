@@ -176,13 +176,21 @@ class Waveapps implements InvoiceContract
 
         $contacts = Contact::whereIn('email', $emails)->where('user_id', \Auth::id())->get();
 
+        \Log::debug('waveapps customer import start for user_id:' . $this->user_id);
+
         $contacts->map(function ($contact) use ($customers_email_id_key_pair) {
-            $contact->customer_id = $customers_email_id_key_pair[$contact->email];
-            $contact->save();
+            if(isset($customers_email_id_key_pair[$contact->email])){
+                $contact->customer_id = $customers_email_id_key_pair[$contact->email];
+                $contact->save();
+                \Log::debug($contact->email);
+            }
+
             return true;
         });
 
         (new InvoiceGatewayModel)->where(['user_id' => \Auth::id()])->update(['contact_sync_at' => now()]);
+
+        \Log::debug('waveapps customer import completed for user_id:' . $this->user_id);
 
         return ['success' => true, 'data' => $contacts];
     }catch (\Exception $exception){
@@ -213,7 +221,7 @@ class Waveapps implements InvoiceContract
 
         if(isset($response['data']['business']['products']) && $response['data']['business']['products'] !== null){
             request()->session()->flash('message', 'product created successfully.');
-            \Log::debug('waveapps Customer listed successfully for user_id:' . $this->user_id, ['_trace' => $response]);
+            \Log::debug('waveapps Products listed successfully for user_id:' . $this->user_id, ['_trace' => $response]);
 
             $return_result = [];
             foreach($response['data']['business']['products']['edges'] as $product){
