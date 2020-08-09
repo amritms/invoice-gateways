@@ -8,7 +8,6 @@ use Amritms\InvoiceGateways\Exceptions\UnauthenticatedException;
 use Amritms\InvoiceGateways\Models\Contact;
 use Amritms\InvoiceGateways\Models\InvoiceGateway as InvoiceGatewayModel;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Amritms\InvoiceGateways\Contracts\Invoice as InvoiceContract;
 
@@ -96,12 +95,8 @@ class Waveapps implements InvoiceContract
             "items" => [
                 'productId' => $product_id
             ],
-            "invoiceNumber" => $input['invoice_number'] ?? ""
+            "invoiceNumber" => $input['invoice_number'] ?? "",
         ];
-
-        if($input['currency_code']){
-            $new_input["currency"] = $input['currency_code'];
-        }
 
         $variables = [
             'input' => $new_input,
@@ -110,7 +105,6 @@ class Waveapps implements InvoiceContract
         $response = $this->waveapps->invoiceCreate($variables, 'InvoiceCreateInput');
 
         if(isset($response['data']['invoiceCreate']['didSucceed']) && $response['data']['invoiceCreate']['didSucceed'] == true){
-            Cache::put($this->user_id . '_invoice_id', $response['data']['invoiceCreate']['invoice']['id'], now()->addMinutes(200));
             \Log::debug('waveapps invoice created successfully for user_id: ' . $this->user_id, ['_trace' => $response]);
 
             return ['success' => true, 'message' => 'Invoice created successfully', 'data' => $response['data']['invoiceCreate']['invoice']];
@@ -440,7 +434,6 @@ class Waveapps implements InvoiceContract
         if(isset($response['data']['invoiceDelete']['didSucceed']) && $response['data']['invoiceDelete']['didSucceed'] == true){
             \Log::debug('Waveapps Invoice deleted successfully for user_id:' . $this->user_id);
             request()->session()->flash('message', 'Invoice deleted successfully.');
-            Cache::put($this->user_id . '_invoice_id', '');
 
             return ['success' => true, 'data' => $response];
         }
