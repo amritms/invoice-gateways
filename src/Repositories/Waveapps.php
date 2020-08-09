@@ -89,7 +89,7 @@ class Waveapps implements InvoiceContract
         $product_id = $input['product_id'];
         $customer_id = $input['customer_id'];
 
-        $input = [
+        $new_input = [
             "businessId" => $this->businessId,
             "customerId" => $customer_id,
             "status" => $input['invoice_create_status'] ?? 'SAVED',
@@ -99,8 +99,12 @@ class Waveapps implements InvoiceContract
             "invoiceNumber" => $input['invoice_number'] ?? ""
         ];
 
+        if($input['currency_code']){
+            $new_input["currency"] = $input['currency_code'];
+        }
+
         $variables = [
-            'input' => $input,
+            'input' => $new_input,
         ];
 
         $response = $this->waveapps->invoiceCreate($variables, 'InvoiceCreateInput');
@@ -361,8 +365,8 @@ class Waveapps implements InvoiceContract
         $variables = [
             "input" => [
                 "businessId" => $this->businessId,
-                "name" => $product['description'],
-                "unitPrice" => $product['amount'],
+                "name" => $product['description'] ?? 'untitled job',
+                "unitPrice" => $product['amount'] ?? 1,
                 "incomeAccountId" => config('invoice-gateways.waveapps.incomeAccountId'),
             ]
         ];
