@@ -96,7 +96,8 @@ class Waveapps implements InvoiceContract
             "items" => [
                 'productId' => $product_id
             ],
-            "invoiceNumber" => $input['invoice_number'] ?? ""
+            "invoiceNumber" => $input['invoice_number'] ?? "",
+            "memo" => $input['memo'] ?? "",
         ];
 
         if($input['currency_code']){
