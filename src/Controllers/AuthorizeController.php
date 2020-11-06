@@ -2,6 +2,7 @@
 
 namespace Amritms\InvoiceGateways\Controllers;
 
+use Illuminate\Http\Request;
 use Amritms\InvoiceGateways\Contracts\Authorize;
 
 class AuthorizeController implements Authorize
@@ -18,9 +19,9 @@ class AuthorizeController implements Authorize
         return $this->authorize->authorize();
     }
 
-    public function callback()
+    public function callback(Request $request)
     {
-        return $this->authorize->callback();
+        return $this->authorize->callback($request);
     }
 
     public function refreshToken()
