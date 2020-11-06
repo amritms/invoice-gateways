@@ -25,4 +25,16 @@ class UnauthenticatedException extends HttpException
     {
         return new static(401, $message ?? 'Something went wrong, Couldn\'t send invoice. Try again',null, [], $status_code);
     }
+
+    public static function forInvoiceDelete($message = null, $status_code = 401)
+    {
+        return new static(401, $message ?? 'Something went wrong, Couldn\'t delete invoice. Try again',null, [], $status_code);
+    }
+
+    public static function forInvoiceDownload($message = null, $status_code = 401)
+    {
+        return new static(401, $message ?? 'Something went wrong, Couldn\'t download invoice. Try again',null, [], $status_code);
+    }
+
+    
 }
