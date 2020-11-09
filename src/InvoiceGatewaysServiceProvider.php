@@ -6,10 +6,11 @@ use Illuminate\Support\ServiceProvider;
 //use Amritms\WaveappsClientPhp\Waveapps;
 use Amritms\InvoiceGateways\Contracts\Invoice;
 use Amritms\InvoiceGateways\Contracts\Authorize;
-use Amritms\InvoiceGateways\Repositories\Waveapps;
 use Amritms\InvoiceGateways\Repositories\Paypal;
+use Amritms\InvoiceGateways\Repositories\Waveapps;
 use Amritms\InvoiceGateways\Repositories\Freshbooks;
 use Amritms\InvoiceGateways\Repositories\AuthorizeWaveapps;
+use Amritms\InvoiceGateways\Repositories\AuthorizeFreshbooks;
 
 class InvoiceGatewaysServiceProvider extends ServiceProvider
 {
@@ -67,9 +68,8 @@ class InvoiceGatewaysServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/config.php', 'invoice-gateways');
 
         $invoice_type = $this->app->request->get('invoice_type');
-
         $invoice_type = isset($invoice_type) ? $invoice_type :  config('invoice-gateways.payment_type');
-
+        // dd($invoice_type);
         $this->app->bind(Invoice::class, function ($app) use($invoice_type){
 
             return $this->resolveInvoice($invoice_type);
@@ -87,7 +87,7 @@ class InvoiceGatewaysServiceProvider extends ServiceProvider
                     break;
 
                 //in case of freshbooks
-                case 'freshbooks' : return new AuthorizeFreshbooks();
+                case 'freshbooks' : return new AuthorizeFreshbooks(config('invoice-gateways.freshbooks'));
                     break;
 
                 //in case of quickbooks
@@ -110,7 +110,7 @@ class InvoiceGatewaysServiceProvider extends ServiceProvider
                 break;
 
             //in case of freshbooks
-            case 'freshbooks' : return new Freshbooks();
+            case 'freshbooks' : return new Freshbooks(null, null, config('invoice-gateways.freshbooks'));
                 break;
 
             //in case of quickbooks

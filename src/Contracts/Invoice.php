@@ -32,4 +32,6 @@ interface Invoice
     public function createCustomer($input = []);
 
     public function createProduct($input = []);
+
+    public function downloadInvoice($job_invoice);
 }
