@@ -29,7 +29,19 @@ interface Invoice
      */
     public function delete($input = []);
 
+    /**
+     * Create Customer
+     */
     public function createCustomer($input = []);
 
+    /**
+     * Create Item or Product
+     */
     public function createProduct($input = []);
+
+    /**
+     * Download Invoice
+     */
+    public function downloadInvoice($job_invoice);
+    
 }

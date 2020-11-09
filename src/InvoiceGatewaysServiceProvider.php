@@ -6,12 +6,13 @@ use Illuminate\Support\ServiceProvider;
 //use Amritms\WaveappsClientPhp\Waveapps;
 use Amritms\InvoiceGateways\Contracts\Invoice;
 use Amritms\InvoiceGateways\Contracts\Authorize;
-use Amritms\InvoiceGateways\Repositories\Waveapps;
 use Amritms\InvoiceGateways\Repositories\Paypal;
+use Amritms\InvoiceGateways\Repositories\Waveapps;
 use Amritms\InvoiceGateways\Repositories\Freshbooks;
 use Amritms\InvoiceGateways\Repositories\Quickbooks;
 use Amritms\InvoiceGateways\Repositories\AuthorizeWaveapps;
 use Amritms\InvoiceGateways\Repositories\AuthorizeQuickbooks;
+use Amritms\InvoiceGateways\Repositories\AuthorizeFreshbooks;
 
 class InvoiceGatewaysServiceProvider extends ServiceProvider
 {
@@ -27,7 +28,6 @@ class InvoiceGatewaysServiceProvider extends ServiceProvider
         // $this->loadViewsFrom(__DIR__.'/../resources/views', 'invoice-gateways');
         // $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
         $this->loadRoutesFrom(__DIR__.'/../routes/routes.php');
-
 
         if ($this->app->runningInConsole()) {
             $this->publishes([
@@ -51,8 +51,6 @@ class InvoiceGatewaysServiceProvider extends ServiceProvider
 
             // Registering package commands.
             // $this->commands([]);
-
-
         }
 
     }
@@ -76,8 +74,6 @@ class InvoiceGatewaysServiceProvider extends ServiceProvider
             return $this->resolveInvoice($user_invoice_type);
         });
 
-
-
         $this->app->bind(Authorize::class, function ($app) use($invoice_type){
             switch($invoice_type){
                 //in case of paypal
@@ -88,7 +84,7 @@ class InvoiceGatewaysServiceProvider extends ServiceProvider
                     break;
 
                 //in case of freshbooks
-                case 'freshbooks' : return new AuthorizeFreshbooks();
+                case 'freshbooks' : return new AuthorizeFreshbooks(config('invoice-gateways.freshbooks'));
                     break;
 
                 //in case of quickbooks
@@ -111,7 +107,7 @@ class InvoiceGatewaysServiceProvider extends ServiceProvider
                 break;
 
             //in case of freshbooks
-            case 'freshbooks' : return new Freshbooks();
+            case 'freshbooks' : return new Freshbooks(config('invoice-gateways.freshbooks'));
                 break;
 
             //in case of quickbooks

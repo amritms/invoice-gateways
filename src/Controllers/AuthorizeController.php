@@ -29,3 +29,4 @@ class AuthorizeController implements Authorize
         return $this->authorize->refreshToken();
     }
 }
+
