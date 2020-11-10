@@ -9,7 +9,9 @@ use Amritms\InvoiceGateways\Contracts\Authorize;
 use Amritms\InvoiceGateways\Repositories\Waveapps;
 use Amritms\InvoiceGateways\Repositories\Paypal;
 use Amritms\InvoiceGateways\Repositories\Freshbooks;
+use Amritms\InvoiceGateways\Repositories\Quickbooks;
 use Amritms\InvoiceGateways\Repositories\AuthorizeWaveapps;
+use Amritms\InvoiceGateways\Repositories\AuthorizeQuickbooks;
 
 class InvoiceGatewaysServiceProvider extends ServiceProvider
 {
@@ -67,12 +69,11 @@ class InvoiceGatewaysServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/config.php', 'invoice-gateways');
 
         $invoice_type = $this->app->request->get('invoice_type');
-
         $invoice_type = isset($invoice_type) ? $invoice_type :  config('invoice-gateways.payment_type');
 
-        $this->app->bind(Invoice::class, function ($app) use($invoice_type){
-
-            return $this->resolveInvoice($invoice_type);
+        $this->app->bind(Invoice::class, function ($app){
+            $user_invoice_type = auth()->user()->invoicesConfig->invoice_type;
+            return $this->resolveInvoice($user_invoice_type);
         });
 
 
@@ -91,7 +92,7 @@ class InvoiceGatewaysServiceProvider extends ServiceProvider
                     break;
 
                 //in case of quickbooks
-                case 'quickbooks' : return new AuthorizeQuickbooks();
+                case 'quickbooks' : return new AuthorizeQuickbooks(config('invoice-gateways.quickbooks'));
                     break;
 
                 //default case
@@ -114,7 +115,7 @@ class InvoiceGatewaysServiceProvider extends ServiceProvider
                 break;
 
             //in case of quickbooks
-            case 'quickbooks' : return new Quickbooks();
+            case 'quickbooks' : return new Quickbooks(config('invoice-gateways.quickbooks'));
                 break;
 
             //default case

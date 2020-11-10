@@ -40,7 +40,20 @@ return [
 	    ],
     ],
     'freshbooks' => [],
-    'quickbooks' => [],
+    'quickbooks' => [
+		'client_id'=> env('QUICK_BOOKS_CLIENT_ID',''),
+		'client_secret' => env('QUICK_BOOKS_CLIENT_SECRET',''),
+		'auth_uri' => env('QUICK_BOOKS_AUTH_URI','https://appcenter.intuit.com/connect/oauth2'),
+		'auth_redirect_uri' => env('QUICK_BOOKS_AUTH_REDIRECT_URI','/invoice-gateways/callback?invoice_type=quickbooks'),
+		'mode' => env('QUICK_BOOKS_MODE','production'),
+		'oauth_scope' => env('QUICK_BOOKS_OAUTH_SCOPE','com.intuit.quickbooks.accounting openid profile email phone address'),
+		'webHook_verify_token' => env('QUICK_BOOKS_WEB_HOOKS_VERIFY_TOKEN',''),
+		'businessId' => env('QUICK_BOOKS_BUSINESS_ID',''),
+		'access_token' => null,
+		'refresh_token' => null,
+		'base_url' => env('QUICK_BOOKS_BASE_URL','https://quickbooks.api.intuit.com'),
+		'invoice_url'=> env('QUICK_BOOKS_INVOICE_URL','')
+	],
     'waveapps' => [
         'client_id' => env('WAVE_CLIENT_ID'),
         'client_secret' => env('WAVE_CLIENT_SECRET'),

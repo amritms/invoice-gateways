@@ -40,4 +40,8 @@ class FailedException extends HttpException
     {
         return new static($status_code, $message ?? 'Something went wrong, Couldn\'t delete invoice.');
     }
+
+    public static function forInvoiceDownload($message = null, $status_code = 400) {
+        return new static($status_code, $message ?? 'Something went wrong, Couldn\'t download invoice.');
+    }
 }
