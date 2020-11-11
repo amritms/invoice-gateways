@@ -149,6 +149,7 @@ class Quickbooks implements InvoiceContract {
      * Delete invoice
      */
     public function delete($input = []){
+        \Log::info($input);
         $invoice = $this->dataService->FindById('Invoice',$input['invoice_id']);
         $error = $this->dataService->getLastError();
 
@@ -159,9 +160,10 @@ class Quickbooks implements InvoiceContract {
             }
             throw FailedException::forInvoiceDelete();
         }
-
+        \Log::debug('test');
         \Log::debug($invoice->Line[0]->SalesItemLineDetail->ItemRef);
         $invoice_config = $this->populateConfigFromDb();
+        \Log::info($invoice_config);
         $variables= [
             'Id'=>$invoice->Id,
             'SyncToken' => $invoice->SyncToken,
@@ -181,6 +183,7 @@ class Quickbooks implements InvoiceContract {
 
         $response = Http::withToken($invoice_config['access_token'])->post($this->base_url.'/v3/company/'.$invoice_config['businessId'].'/invoice?operation=delete',$variables);
 
+        \Log::info($response);
         if($response->failed()) {
             throw FailedException::forInvoiceDelete();
         }
@@ -407,6 +410,6 @@ class Quickbooks implements InvoiceContract {
         config(['invoice-gateways.waveapps.access_token' => $this->access_token]);
         config(['invoice-gateways.waveapps.expires_in' => $this->expires_in]);
 
-        return $config;
+        return $config->config;
     }
 }
