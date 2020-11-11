@@ -160,7 +160,6 @@ class Quickbooks implements InvoiceContract {
             throw FailedException::forInvoiceDelete();
         }
 
-        \Log::debug($invoice->Line[0]->SalesItemLineDetail->ItemRef);
         $invoice_config = $this->populateConfigFromDb();
         $variables= [
             'Id'=>$invoice->Id,
@@ -407,6 +406,6 @@ class Quickbooks implements InvoiceContract {
         config(['invoice-gateways.waveapps.access_token' => $this->access_token]);
         config(['invoice-gateways.waveapps.expires_in' => $this->expires_in]);
 
-        return $config;
+        return $config->config;
     }
 }
