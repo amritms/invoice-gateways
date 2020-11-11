@@ -23,7 +23,7 @@
         "paypal/rest-api-sdk-php": "^1.14",
         "amritms/waveapps-client-php": "^0.2",
         "quickbooks/v3-php-sdk": "^5.4",
-        "sabinks/freshbooks-client-php" : "^0.2.0"
+        "sabinks/freshbooks-client-php":"^0.1.0"
     },
     "require-dev": {
         "orchestra/testbench": "^5.0",
