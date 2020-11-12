@@ -3,6 +3,7 @@
 namespace Amritms\InvoiceGateways\Repositories;
 
 use Illuminate\Support\Arr;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Amritms\InvoiceGateways\Contracts\Authorize;
 use Amritms\InvoiceGateways\Models\InvoiceGateway as InvoiceGatewayModel;
@@ -56,7 +57,7 @@ class AuthorizeFreshbooks implements Authorize{
      * code - The server returns the authorization code in the query string. May only be exchanged * once and expire 10 minutes after issuance.
      * state - The server returns the same state value that you passed (if you provided one). If the states don't match, the request may have been created by a third party and you should abort the process.
      */
-    public function callback()
+    public function callback(Request $request)
     {
         if(! request('code')){
             \Log::error('something went wrong, freshbooks didn\'t return code', ['_trace' => request()->json()]);
