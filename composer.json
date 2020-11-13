@@ -22,7 +22,8 @@
         "illuminate/database": "^6.18|^7.0",
         "paypal/rest-api-sdk-php": "^1.14",
         "amritms/waveapps-client-php": "^0.2",
-        "quickbooks/v3-php-sdk": "^5.4"
+        "quickbooks/v3-php-sdk": "^5.4",
+        "sabinks/freshbooks-client-php":"^0.1.2"
     },
     "require-dev": {
         "orchestra/testbench": "^5.0",
