@@ -1,0 +1,60 @@
+{
+    "name": "amritms/invoice-gateways",
+    "description": "Single gateway for multiple invoice services",
+    "keywords": [
+        "amritms",
+        "invoice-gateways"
+    ],
+    "homepage": "https://github.com/amritms/invoice-gateways",
+    "license": "MIT",
+    "type": "library",
+    "authors": [
+        {
+            "name": "Amrit Man Shrestha",
+            "email": "amritms@gmail.com",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^7.2",
+        "ext-json": "*",
+        "illuminate/support": "^7.0",
+        "illuminate/database": "^6.18|^7.0",
+        "paypal/rest-api-sdk-php": "^1.14",
+        "amritms/waveapps-client-php": "^0.2",
+        "quickbooks/v3-php-sdk": "^5.4",
+        "sabinks/freshbooks-client-php":"^0.2.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^5.0",
+        "phpunit/phpunit": "^9.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Amritms\\InvoiceGateways\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Amritms\\InvoiceGateways\\Tests\\": "tests"
+        }
+    },
+    "scripts": {
+        "test": "vendor/bin/phpunit",
+        "test-coverage": "vendor/bin/phpunit --coverage-html coverage"
+
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Amritms\\InvoiceGateways\\InvoiceGatewaysServiceProvider"
+            ],
+            "aliases": {
+                "InvoiceGateways": "Amritms\\InvoiceGateways\\Facades"
+            }
+        }
+    }
+}
