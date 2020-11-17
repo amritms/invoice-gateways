@@ -37,7 +37,7 @@ interface Invoice
     /**
      * Create Item or Product
      */
-    public function createProduct($input = []);
+    public function createProduct($input = [], $invoice_number);
 
     /**
      * Download Invoice

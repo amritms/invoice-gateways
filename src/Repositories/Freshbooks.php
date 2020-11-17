@@ -62,32 +62,30 @@ class Freshbooks implements InvoiceContract
             'product' => $input['product'],
             "invoiceNumber" => $input['invoice_number'] ?? "",
         ];
-        $response = $this->freshbooks->invoiceCreate($variables);
-        \Log::info($response);  
-        if(isset($response['invoice'])){
-            \Log::debug('Freshbooks invoice created successfully for user_id: ' . $this->user_id, ['_trace' => $response]);
-            $invoice = $response['invoice'];
-
-            return ['success' => true, 
-                    'message' => 'Invoice created successfully', 
-                    'data' => [
-                        'id' => $invoice['invoiceid'],
-                        'invoiceNumber' => $invoice['invoice_number'],
-                        'pdfUrl' => '',
-                        'viewUrl' => '',
-                        'status' => 'SAVED',
-                    ]
-                ];
+        $data = $this->freshbooks->invoiceCreate($variables);
+        if($data->failed()){
+            $error = $data['response']['errors'][0];
+            \Log::error('Could\'t create freshbooks invoice. user_id:' . $this->user_id, ['data' => $error]);
+            throw FailedException::forInvoiceCreate( $error['message'], 422);
+        }else{
+            $result = $data['response']['result'];
+            if(isset($result['invoice'])){
+                \Log::debug('Freshbooks invoice created successfully for user_id: ' . $this->user_id, ['_trace' => $result]);
+                $invoice = $result['invoice'];
+    
+                return [
+                    'success' => true, 
+                        'message' => 'Invoice created successfully', 
+                        'data' => [
+                            'id' => $invoice['invoiceid'],
+                            'invoiceNumber' => $invoice['invoice_number'],
+                            'pdfUrl' => '',
+                            'viewUrl' => '',
+                            'status' => 'SAVED',
+                        ]
+                    ];
+            }
         }
-
-        if(isset($response[0]['errno'])){
-            \Log::error('Could\'t create freshbooks invoice. user_id:' . $this->user_id, ['data' => $response]);
-            $code = $response[0]['errno'] ?? $response[0]['errno'] == 'INVALID' ? 422 : 400;
-            
-            throw FailedException::forInvoiceCreate($response['data']['invoiceCreate']['inputErrors'][0]['message'], $code);
-        }
-        
-        throw FailedException::forInvoiceCreate();
     }
 
     /**
@@ -195,31 +193,55 @@ class Freshbooks implements InvoiceContract
     }
 
 
-    public function createProduct($product = [])
+    public function createProduct($product = [], $invoice_number)
     {
-        $response = $this->freshbooks->createProduct($product);
-        if(isset($response[0]['errno']) && $response[0]['errno'] ==  1003){
-            \Log::debug('Couldn\'t create product for creating invoice for user_id:' . $this->user_id, ['_trace' => $response]);
-            (new AuthorizeFreshbooks( config('invoice-gateways.freshbooks')))->refreshToken();
+        $data = $this->freshbooks->getInvoicesList();
+        if($data->ok()){
+            $invoices = $data->json()['response']['result']['invoices'];
+            $invoice_number_list = [];
+            foreach($invoices as $invoice){
+                $invoice_number_list[] = $invoice['invoice_number'] ? $invoice['invoice_number'] : '';
+            }
+            if(in_array($invoice_number, $invoice_number_list)){
+                throw FailedException::forProductCreate('Invoice number already exists, please try something new!',422);
+            }
+        }
+        
+        $data = $this->freshbooks->checkProductExist($product);
+        if($data->ok()){
+            $response = $data->json()['response']['result'];
+            if($response['items']){
+                \Log::debug('Freshbooks existing items used for user_id:' . $this->user_id, ['_trace' => $response]);
 
-            throw UnauthenticatedException::forCustomerAll();
-        }elseif(isset($response[0]['errno']) && $response[0]['errno'] ==  12002){
-            \Log::error('Product already created' . $this->user_id, ['_trace' => $response]);
-
-            throw FailedException::forProductCreate('Product already created on Freshbooks Item List!',422);
-        }elseif(isset($response[0])){
-            \Log::error('couldn\'t create freshboooks product for user_id: ' . $this->user_id, ['_trace' => $response]);
-
-            throw FailedException::forProductCreate();
+                return [
+                    'id' => $response['items'][0]['id'], 
+                    'name' => $response['items'][0]['name'],
+                    'product' => $response['items'][0]
+                ];
+            }
         }
 
-        \Log::debug('Freshbooks Product created successfully for user_id:' . $this->user_id, ['_trace' => $response]);
-       
-        return [
-            'id' => $response['item']['id'], 
-            'name' => $response['item']['name'],
-            'product' => $response['item']
-        ];
+        $data = $this->freshbooks->createProduct($product);
+        if($data->ok()){
+            $response = $data->json()['response']['result'];
+            \Log::debug('Freshbooks Product created successfully for user_id:' . $this->user_id, ['_trace' => $response]);
+            
+            return [
+                'id' => $response['item']['id'], 
+                'name' => $response['item']['name'],
+                'product' => $response['item']
+            ];  
+        }else{
+            $error = $data->json()['response']['errors'][0];
+            if($error['errno']== 1003){
+                \Log::debug('Token generation from refresh token for user_id:' . $this->user_id, ['_trace' => $error]);
+                (new AuthorizeFreshbooks( config('invoice-gateways.freshbooks')))->refreshToken();
+                throw UnauthenticatedException::forCustomerAll();
+            }else{
+                \Log::error('Product already created' . $this->user_id, ['_trace' => $error]);
+                throw FailedException::forProductCreate($error['message'], 422);
+            }
+        }             
     }
 
     private function populateConfigFromDb()
