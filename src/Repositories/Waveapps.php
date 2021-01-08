@@ -349,7 +349,7 @@ class Waveapps implements InvoiceContract
     /**
      * create Product - job
      */
-    public function createProduct($product = [])
+    public function createProduct($product = [], $invoice_number)
     {
         if(!$this->incomeAccountId){
             $accountId = $this->getAccountId();
