@@ -215,11 +215,7 @@ class Quickbooks implements InvoiceContract {
         ];
     }
 
-<<<<<<< HEAD
-    public function createProduct($input = []) {
-=======
     public function createProduct($input = [], $invoice_number) {
->>>>>>> IG-004-a : Invoice Number Duplicate Fix & Product Exist no new create
         $account_id = $invoice_config['incomeAccountId'] ?? '';
         if(empty($account_id)) {
             
