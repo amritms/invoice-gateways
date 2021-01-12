@@ -207,19 +207,22 @@ class Freshbooks implements InvoiceContract
             }
         }
         
-        $data = $this->freshbooks->checkProductExist($product);
-        if($data->ok()){
-            $response = $data->json()['response']['result'];
-            if($response['items']){
-                \Log::debug('Freshbooks existing items used for user_id:' . $this->user_id, ['_trace' => $response]);
+        // $data = $this->freshbooks->checkProductExist($product);
+        // if($data->ok()){
+        //     $response = $data->json()['response']['result'];
+        //     \Log::Info($data->json()['response']);
+        //     if($response['items']){
+        //         $message = 'Fresbooks(FB) duplicate item message: FB does not support duplicate/repeated items. Please update the Job Title for this invoice. Save. And then try again.';
+        //         throw FailedException::forProductCreate($message, 422);
+        //         \Log::debug('Freshbooks existing items used for user_id:' . $this->user_id, ['_trace' => $response]);
 
-                return [
-                    'id' => $response['items'][0]['id'], 
-                    'name' => $response['items'][0]['name'],
-                    'product' => $response['items'][0]
-                ];
-            }
-        }
+        //         // return [
+        //         //     'id' => $response['items'][0]['id'], 
+        //         //     'name' => $response['items'][0]['name'],
+        //         //     'product' => $response['items'][0]
+        //         // ];
+        //     }
+        // }
 
         $data = $this->freshbooks->createProduct($product);
         if($data->ok()){
@@ -239,7 +242,9 @@ class Freshbooks implements InvoiceContract
                 throw UnauthenticatedException::forCustomerAll();
             }else{
                 \Log::error('Product already created' . $this->user_id, ['_trace' => $error]);
-                throw FailedException::forProductCreate($error['message'], 422);
+                $message = 'Fresbooks(FB) duplicate item message: FB does not support duplicate/repeated items. Please update the Job Title for this invoice. Save. And then try again.';
+                throw FailedException::forProductCreate($message, 422);
+                // throw FailedException::forProductCreate($error['message'], 422);
             }
         }             
     }
