@@ -14,7 +14,10 @@ return [
 	    # Account credentials from developer portal
 	    'account' => [
 	        'client_id'		=> env('PAYPAL_CLIENT_ID', ''),
-	        'client_secret' => env('PAYPAL_CLIENT_SECRET', ''),
+			'client_secret' => env('PAYPAL_CLIENT_SECRET', ''),
+			'auth_scope' => env('PAYPAL_AUTH_SCOPE',"openid profile email address "),
+			'auth_redirect_uri' => env("PAYPAL_AUTH_REDIRECT_URI",'/invoice-gateways/call-back?invoice_type=paypal'),
+			'auth_uri' => env('PAYPAL_AUTH_URI','https://www.sandbox.paypal.com/signin/authorize')
 	    ],
 
 	    # Connection Information
@@ -37,7 +40,8 @@ return [
 	        # Logging is most verbose in the 'FINE' level and
 	        # decreases as you proceed towards ERROR
 	        'log_level' => 'FINE',
-	    ],
+		],
+		
     ],
 	'freshbooks' => [
 		'client_id' => env('FRESHBOOKS_CLIENT_ID'),

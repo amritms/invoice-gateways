@@ -10,9 +10,10 @@ use Amritms\InvoiceGateways\Repositories\Paypal;
 use Amritms\InvoiceGateways\Repositories\Waveapps;
 use Amritms\InvoiceGateways\Repositories\Freshbooks;
 use Amritms\InvoiceGateways\Repositories\Quickbooks;
+use Amritms\InvoiceGateways\Repositories\AuthorizePaypal;
 use Amritms\InvoiceGateways\Repositories\AuthorizeWaveapps;
-use Amritms\InvoiceGateways\Repositories\AuthorizeQuickbooks;
 use Amritms\InvoiceGateways\Repositories\AuthorizeFreshbooks;
+use Amritms\InvoiceGateways\Repositories\AuthorizeQuickbooks;
 
 class InvoiceGatewaysServiceProvider extends ServiceProvider
 {
