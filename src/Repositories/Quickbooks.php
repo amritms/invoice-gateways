@@ -278,10 +278,12 @@ class Quickbooks implements InvoiceContract {
             $xml = simplexml_load_string($response->body());
             $json = json_encode($xml);
             $array = json_decode($json,TRUE);            
-            $user_invoice_config['incomeAccountId'] = $array['QueryResponse']['Account']['Id'];
-            $invoice_config->update(['config' => $user_invoice_config ]);
+            if(!empty($array['QueryResponse'])){
+                $user_invoice_config['incomeAccountId'] = $array['QueryResponse']['Account']['Id'];
+                $invoice_config->update(['config' => $user_invoice_config ]);
 
-            return $array['QueryResponse']['Account']['Id'];
+                return $array['QueryResponse']['Account']['Id'];
+            }
         }
 
         $accountResource = Account::create([

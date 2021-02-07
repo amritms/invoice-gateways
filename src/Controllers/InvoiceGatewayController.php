@@ -41,7 +41,7 @@ class InvoiceGatewayController implements Invoice
 
     public function createCustomer($input = []){}
 
-    public function createProduct($input = []){}
+    public function createProduct($input = [],$invoice_number){}
 
     public function syncContacts()
     {
