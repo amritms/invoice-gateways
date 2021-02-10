@@ -242,7 +242,7 @@ class Freshbooks implements InvoiceContract
                 throw UnauthenticatedException::forCustomerAll();
             }else{
                 \Log::error('Product already created' . $this->user_id, ['_trace' => $error]);
-                $message = 'Fresbooks(FB) duplicate item message: FB does not support duplicate/repeated items. Please update the Job Title for this invoice. Save. And then try again.';
+                $message = $input['message'] ?? 'Fresbooks(FB) duplicate item message: FB does not support duplicate/repeated items. Please update the Job Title for this invoice. Save. And then try again.';
                 throw FailedException::forProductCreate($message, 422);
                 // throw FailedException::forProductCreate($error['message'], 422);
             }
