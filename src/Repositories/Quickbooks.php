@@ -39,8 +39,11 @@ class Quickbooks implements InvoiceContract {
         }
 
         $invoice_config = InvoiceGatewayModel::whereUserId(auth()->id())->first();
-        $this->user_invoice_config = $invoice_config->config;
-        $this->client_id = $config['client_id'];
+        $expiration_time = \Carbon\Carbon::parse($invoice_config->config['expires_in'])->subMinutes(2);
+        
+        if((! empty($invoice_config->config['expires_in']) && now()->greaterThanOrEqualTo($expiration_time))) {
+            (new AuthorizeQuickbooks($config))->refreshToken($config['refresh_token']);
+        }
 
         $this->dataService = DataService::configure([
             'auth_mode' => 'oauth2',
@@ -243,6 +246,7 @@ class Quickbooks implements InvoiceContract {
             elseif($error->getHttpStatusCode() == 400) {
                 $message = $input['message'] ??'QuickBooks (QB) requires a unique job name for every new invoice created via VOICEOVERVIEW. To continue from VOV, please update the Job Title for this invoice. Or you can create a new invoice via QB by selecting the line item already created.';
             }
+            
             throw FailedException::forProductCreate($message,422);
         }
 
@@ -355,12 +359,13 @@ class Quickbooks implements InvoiceContract {
         $i = 1;
         $allCustomers = $this->dataService->FindAll('Customer', $i, 500);
         $error = $this->dataService->getLastError();
+
         if($error) {
             if($error->getHttpStatusCode() == 401) {
                 (new AuthorizeQuickbooks(config('invoice-gateways.quickbooks')))->refreshToken();
-
                 throw UnauthenticatedException::forCustomerAll();
             }
+            \Log::info($error->getResponseBody());
 
             throw FailedException::forCustomerAll();
         }
@@ -407,11 +412,11 @@ class Quickbooks implements InvoiceContract {
         $this->access_token    = $config['config']['access_token'] ?? null;
         $this->expires_in      = $config['config']['expires_in'] ?? null;
 
-        config(['invoice-gateways.waveapps.businessId' => $this->businessId]);
-        config(['invoice-gateways.waveapps.refresh_token' => $this->refresh_token]);
-        config(['invoice-gateways.waveapps.incomeAccountId' => $this->incomeAccountId]);
-        config(['invoice-gateways.waveapps.access_token' => $this->access_token]);
-        config(['invoice-gateways.waveapps.expires_in' => $this->expires_in]);
+        config(['invoice-gateways.quickbooks.businessId' => $this->businessId]);
+        config(['invoice-gateways.quickbooks.refresh_token' => $this->refresh_token]);
+        config(['invoice-gateways.quickbooks.incomeAccountId' => $this->incomeAccountId]);
+        config(['invoice-gateways.quickbooks.access_token' => $this->access_token]);
+        config(['invoice-gateways.quickbooks.expires_in' => $this->expires_in]);
 
         return $config->config;
     }
