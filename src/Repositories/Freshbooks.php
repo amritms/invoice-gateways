@@ -41,10 +41,12 @@ class Freshbooks implements InvoiceContract
         $this->populateConfigFromDb();
         $this->state = 'csrf_protection_' . $this->user_id;
         $config = config('invoice-gateways.freshbooks');
-        $expires_time = Carbon::parse($config['expires_in']);
-        if ($config['access_token'] == null || (! empty($config['expires_in']) && now()->greaterThanOrEqualTo($expires_time))){
+        $expires_time = \Carbon\Carbon::parse($config['expires_in'])->subMinutes(2);
+        
+        if ((! empty($config['expires_in']) && now()->greaterThanOrEqualTo($expires_time))){
             (new AuthorizeFreshbooks($config))->refreshToken();
         }
+        
         $this->freshbooks = new FreshbooksClientPhp( null, null, config('invoice-gateways.freshbooks'));
         return $this->freshbooks;
     }
