@@ -87,6 +87,9 @@ class Quickbooks implements InvoiceContract {
         }
         $invoice = Invoice::create($variables);
         $resultingInvoice = $this->dataService->Add($invoice);
+        if(!$resultingInvoice) {
+            return $this->create($input);
+        }
         $error = $this->dataService->getLastError();
 
         if($error) {
