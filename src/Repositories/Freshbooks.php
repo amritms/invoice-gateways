@@ -266,6 +266,8 @@ class Freshbooks implements InvoiceContract
         config(['invoice-gateways.freshbooks.incomeAccountId' => $this->incomeAccountId]);
         config(['invoice-gateways.freshbooks.access_token' => $this->access_token]);
         config(['invoice-gateways.freshbooks.expires_in' => $this->expires_in]);
+
+        return $config->config;
     }
 
     public function getAllCustomers()
@@ -307,5 +309,13 @@ class Freshbooks implements InvoiceContract
     public function downloadInvoice($invoice_id)
     {
         return $this->freshbooks->downloadInvoice($invoice_id);
+    }
+
+    public function getItems() {
+        $invoice_config = $this->populateConfigFromDb();
+        $response = Http::withToken($invoice_config['access_token'])
+        ->get('https://api.freshbooks.com/accounting/account/' . $this->businessId .'/items/items');
+
+        return $this->freshbooks->getResponse($response);
     }
 }
