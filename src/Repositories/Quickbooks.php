@@ -64,17 +64,19 @@ class Quickbooks implements InvoiceContract {
             'Line' => [
                         [
                             "Amount" => $input['price'],
+                            "Description" => $input['description'],
                             'DetailType' => "SalesItemLineDetail",
                             "SalesItemLineDetail" => [
                                 "ItemRef" => [
                                 "value" => $input['product_id'],
-                
-                                ]
+                                ],
+                                "UnitPrice" => $input['price'],
                             ]
                         ]
                       ],
+            
             'CustomerRef' => [
-                'value' => $input['customer_id']
+                'value' => $input['customer_id'],
             ],
             'BillEmail' => [
                 'Address' => $input['billing_address']
@@ -422,5 +424,30 @@ class Quickbooks implements InvoiceContract {
         config(['invoice-gateways.quickbooks.expires_in' => $this->expires_in]);
 
         return $config->config;
+    }
+
+    public function getItems() {
+        $invoice_config = $this->populateConfigFromDb();
+        $url = $this->base_url.'/v3/company/'.$invoice_config['businessId']."/query?query=SELECT * from Item&minorversion=55 ";
+        $response = Http::withToken($invoice_config['access_token'])->get($url);
+
+        if($response->failed()) {
+            \Log::error('failed to get items for user_id:'.$this->user_id,["__trace" => $response->json()]);
+            if($response->status() == 401) {
+               (new AuthorizeQuickbooks(config('invoice-gateways.quickbooks')))->refreshToken();
+               $this->getItems();
+           }
+        }
+
+        if($response->ok()) {
+            \Log::info('quickbooks items/products/services retrived successfully for user_id:'.$this->user_id);
+            $xml = simplexml_load_string($response->body());
+            $json = json_encode($xml);
+            $array = json_decode($json,TRUE);            
+            if(!empty($array['QueryResponse'])){
+                return $array['QueryResponse']['Item'];
+            }
+        }
+
     }
 }
