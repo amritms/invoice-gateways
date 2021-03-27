@@ -335,9 +335,9 @@ class Freshbooks implements InvoiceContract
         $new_response =  $this->freshbooks->getResponse($response);
 
         return [
-            'id' => $response['item']['id'], 
-            'name' => $response['item']['name'],
-            'product' => $response['item']
+            'id' => $new_response['item']['id'], 
+            'name' => $new_response['item']['name'],
+            'product' => $new_response['item']
         ];          
     }
 }
