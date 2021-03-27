@@ -57,15 +57,35 @@ class Freshbooks implements InvoiceContract
      */
     public function create($input = [])
     {  
-        $variables = [
-            "businessId" => $this->businessId,
-            "customerId" => $input['customer_id'],
-            "customerEmail" => $input['billing_address'],
-            "status" => $input['invoice_create_status'] ?? 'SAVED',
-            'product' => $input['product'],
-            "invoiceNumber" => $input['invoice_number'] ?? "",
+        $config = $this->populateConfigFromDb();
+        $invoice = [     
+            "email" =>  $input['billing_address'], //client email
+            "customerid" =>  $input['customer_id'],        //client id
+            "create_date" =>  Carbon::now()->toDateString(), 
+            "lines" =>  [
+                [ 
+                    'name' => $input['product']['product']['name'],
+                    'qty' => 1,
+                    'description' => $input['description'],
+                    "sku" => $input['product']['product']['id'],
+                    "vis_state" => $input['product']['product']['vis_state'],
+                    'unit_cost' => [
+                        'amount' => $input['job']['amount'],
+                        'code' => $input['product']['product']['unit_cost']['code']
+                    ]
+                ],
+            ]
         ];
-        $data = $this->freshbooks->invoiceCreate($variables);
+        if($input['invoice_number']){
+            $invoice['invoice_number'] =  $input['invoice_number'];
+        }
+   
+        $data = Http::withToken($config['access_token'])
+            ->post('https://api.freshbooks.com/accounting/account/' . $this->businessId .'/invoices/invoices',[
+            "invoice" =>  $invoice
+        ]);     
+
+
         if($data->failed()){
             $error = $data['response']['errors'][0];
             \Log::error('Could\'t create freshbooks invoice. user_id:' . $this->user_id, ['data' => $error]);
