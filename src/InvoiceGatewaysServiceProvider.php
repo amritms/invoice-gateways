@@ -65,7 +65,6 @@ class InvoiceGatewaysServiceProvider extends ServiceProvider
 
         // Automatically apply the package configuration
         $this->mergeConfigFrom(__DIR__.'/../config/config.php', 'invoice-gateways');
-
         $invoice_type = $this->app->request->get('invoice_type');
         $invoice_type = isset($invoice_type) ? $invoice_type :  config('invoice-gateways.payment_type');
 
