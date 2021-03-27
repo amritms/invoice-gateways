@@ -473,4 +473,8 @@ class Waveapps implements InvoiceContract
         config(['invoice-gateways.waveapps.access_token' => $this->access_token]);
         config(['invoice-gateways.waveapps.expires_in' => $this->expires_in]);
     }
+
+    public function getProductDetail($item_id) {
+
+    }
 }

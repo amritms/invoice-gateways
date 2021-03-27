@@ -3,6 +3,7 @@
 namespace Amritms\InvoiceGateways\Repositories;
 
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Http;
 use Amritms\InvoiceGateways\Models\Contact;
 use Sabinks\FreshbooksClientPhp\FreshbooksClientPhp;
 use Amritms\InvoiceGateways\Exceptions\FailedException;
@@ -316,6 +317,27 @@ class Freshbooks implements InvoiceContract
         $response = Http::withToken($invoice_config['access_token'])
         ->get('https://api.freshbooks.com/accounting/account/' . $this->businessId .'/items/items');
 
+        if(isset($response[0]['errno']) && $response[0]['errno'] ==  1003){
+            (new AuthorizeFreshbooks( config('invoice-gateways.freshbooks')))->refreshToken();
+            $this->getItems();
+        }
         return $this->freshbooks->getResponse($response);
+    }
+
+    public function getProductDetail($item_id){
+        $invoice_config = $this->populateConfigFromDb();
+        $response = Http::withToken($invoice_config['access_token'])
+        ->get('https://api.freshbooks.com/accounting/account/' . $this->businessId .'/items/items/'.$item_id);
+
+        if(isset($response[0]['errno']) && $response[0]['errno'] ==  1003){
+            (new AuthorizeFreshbooks( config('invoice-gateways.freshbooks')))->refreshToken();
+        }
+        $new_response =  $this->freshbooks->getResponse($response);
+
+        return [
+            'id' => $response['item']['id'], 
+            'name' => $response['item']['name'],
+            'product' => $response['item']
+        ];          
     }
 }

@@ -71,6 +71,8 @@ class Quickbooks implements InvoiceContract {
                                 "value" => $input['product_id'],
                                 ],
                                 "UnitPrice" => $input['price'],
+                                'Qty' => 1,
+                                'ServiceDate' => $input['job']['jobdate']
                             ]
                         ]
                       ],
@@ -448,6 +450,10 @@ class Quickbooks implements InvoiceContract {
                 return $array['QueryResponse']['Item'];
             }
         }
+
+    }
+
+    public function getProductDetail($item_id) {
 
     }
 }
