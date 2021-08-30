@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Http;
 use QuickBooksOnline\API\Facades\Item;
 use QuickBooksOnline\API\Facades\Account;
 use QuickBooksOnline\API\Facades\Invoice;
+use QuickBooksOnline\API\Facades\Payment;
 use QuickBooksOnline\API\Facades\Customer;
 use Amritms\InvoiceGateways\Models\Contact;
 use QuickBooksOnline\API\DataService\DataService;
@@ -24,6 +25,7 @@ class Quickbooks implements InvoiceContract {
     protected $config;
     private $user_invoice_config;
     protected $base_url;
+    const API_VERSION = 62;
 
     public function __construct(array $config = []) {
         $this->config = $config;
@@ -60,12 +62,21 @@ class Quickbooks implements InvoiceContract {
      * Create invoice and send.
      */
     public function create($input = []) {
+
+        $message = $this->getInvoiceMessage();
+        // $payment = $this->createPayment($input['price'],$input['customer_id']);
         $variables = [
             'Line' => [
                         [
                             "Amount" => $input['price'],
                             "Description" => $input['description'],
                             'DetailType' => "SalesItemLineDetail",
+                            // 'LinkedTxn' => [
+                            //     [
+                            //         'TxnId' => $payment->Id,
+                            //         'TxnType' => 'Payment'
+                            //     ]
+                            // ],
                             "SalesItemLineDetail" => [
                                 "ItemRef" => [
                                 "value" => $input['product_id'],
@@ -73,7 +84,8 @@ class Quickbooks implements InvoiceContract {
                                 "UnitPrice" => $input['price'],
                                 'Qty' => 1,
                                 'ServiceDate' => $input['job']['jobdate']
-                            ]
+                            ],
+                            
                         ]
                       ],
             
@@ -82,7 +94,10 @@ class Quickbooks implements InvoiceContract {
             ],
             'BillEmail' => [
                 'Address' => $input['billing_address']
-            ]
+            ],
+            'CustomerMemo' => $message,
+            'AllowOnlineCreditCardPayment' => true,
+            'AllowOnlineACHPayment'=> true
             ];
 
         if(isset($input['invoice_number'])) {
@@ -97,6 +112,7 @@ class Quickbooks implements InvoiceContract {
         $error = $this->dataService->getLastError();
 
         if($error) {
+            \Log::error('failed to create invoice for job:'.$input['job']['id'],['_trace'=>$error]);
             \Log::error('failed to create invoice for user:'.$this->user_id,['_trace'=>$error]);
             if($error->getHttpStatusCode() == 401) {
                 (new AuthorizeQuickbooks(config('invoice-gateways.quickbooks')))->refreshToken();
@@ -399,6 +415,7 @@ class Quickbooks implements InvoiceContract {
             \Log::error('Failed to download invoice for user_id:'.$this->user_id,['__trace' => $error]);
             if($error->getHttpStatusCode() == 401) {
                 (new AuthorizeQuickbooks(config('invoice-gateways.quickbooks')))->refreshToken();
+                $this->downloadInvoice($invoice_id);
                 throw UnauthenticatedException::forInvoiceDownload();
             }
             throw FailedException::forInvoiceDownload();
@@ -456,4 +473,55 @@ class Quickbooks implements InvoiceContract {
     public function getProductDetail($item_id) {
 
     }
+
+    public function createPayment($totalAmt,$customerRef) {
+
+        $QBPayment = Payment::create([
+            'TotalAmt' => $totalAmt,
+            "CustomerRef" => [
+                "value" => $customerRef
+            ]
+        ]);
+
+        $payment = $this->dataService->Add($QBPayment);
+
+        $error = $this->dataService->getLastError();
+        if($error) {
+            if($error->getHttpStatusCode() == 401) {
+                (new AuthorizeQuickbooks(config('invoice-gateways.quickbooks')))->refreshToken();
+            }
+            throw FailedException::forInvoiceCreate();
+        }
+
+        return $payment;
+
+    }
+
+    public function paymentMethod() {
+        $invoice_config = $this->populateConfigFromDb();
+        $query = "SELECT * from PaymentMethod";
+        $response = Http::withToken($invoice_config['access_token'])->get($this->base_url.'/v3/company/'.$invoice_config['businessId'].'/query',[
+            'query' => $query,
+            'minorversion' => self::API_VERSION
+        ]);
+
+        $xml = simplexml_load_string($response->body());
+        $json = json_encode($xml);
+        $array = json_decode($json,TRUE);
+        return $array;
+    }
+
+    public function getInvoiceMessage() {
+        $invoice_config = $this->populateConfigFromDb();
+        $response = Http::withToken($invoice_config['access_token'])->withHeaders(['Accept'=> 'application/json'])->get($this->base_url.'/v3/company/'.$invoice_config['businessId'].'/preferences');
+
+        $body = $response->json();
+        $message = '';
+
+        if(!empty($body['Preferences']) && !empty($body['Preferences']['SalesFormsPrefs']) && !empty($body['Preferences']['SalesFormsPrefs']['DefaultCustomerMessage'])) {
+            $message = $body['Preferences']['SalesFormsPrefs']['DefaultCustomerMessage'];
+        }
+        return $message;
+    }
+
 }
