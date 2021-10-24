@@ -122,6 +122,10 @@ class AuthorizeFreshbooks implements Authorize{
                 "expires_in" => now()->addSeconds($response['expires_in'])
             ]
         ];
+        $prev_config = (new InvoiceGatewayModel)->where(['user_id' => $user_id])->first();
+        if($prev_config) {
+            $invoice_config['business_id'] = $prev_config['business_id'] ?? null;
+        }
         (new InvoiceGatewayModel)->updateOrCreate(['user_id' => $user_id], $invoice_configs);
 
         \Log::debug('Application verified successfully for user::' . $user_id, ['_trace' => $response]);
@@ -155,8 +159,8 @@ class AuthorizeFreshbooks implements Authorize{
         $response = HTTP::post('https://api.freshbooks.com/auth/oauth/token', $body);
 
         // refresh token is stored indefinitely, if waveaps returns unauthorized(401) status code, then redirect user to get access token.
-        if(in_array($response->status(), [400, 401])){
-            \Redirect::to(route('invoce-gateways.authorize'))->send();
+        if($response->failed()){
+            \Redirect::to(route('invoce-gateways.authorize',['invoice_type'=> 'freshbooks']))->send();
         }
 
         $header = [

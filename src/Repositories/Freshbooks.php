@@ -330,7 +330,7 @@ class Freshbooks implements InvoiceContract
         return $this->freshbooks->downloadInvoice($invoice_id);
     }
 
-    public function getItems() {
+    public function getItems($page_limit = 20) {
         $invoice_config = $this->populateConfigFromDb();
         $response = Http::withToken($invoice_config['access_token'])
         ->get('https://api.freshbooks.com/accounting/account/' . $this->businessId .'/projects/tasks');

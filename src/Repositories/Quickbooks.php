@@ -106,12 +106,10 @@ class Quickbooks implements InvoiceContract {
         }
         $invoice = Invoice::create($variables);
         $resultingInvoice = $this->dataService->Add($invoice);
-        if(!$resultingInvoice) {
-            return $this->create($input);
-        }
         $error = $this->dataService->getLastError();
 
         if($error) {
+
             \Log::error('failed to create invoice for job:'.$input['job']['id'],['_trace'=>$error]);
             \Log::error('failed to create invoice for user:'.$this->user_id,['_trace'=>$error]);
             if($error->getHttpStatusCode() == 401) {
@@ -119,7 +117,10 @@ class Quickbooks implements InvoiceContract {
                 throw UnauthenticatedException::forInvoiceCreate();
             }
 
-            throw FailedException::forInvoiceCreate();
+            $xml = simplexml_load_string($error->getResponseBody(), "SimpleXMLElement", LIBXML_NOCDATA);
+            $json = json_encode($xml);
+            $error = json_decode($json,TRUE);
+            throw FailedException::forInvoiceCreate($error['Fault']['Error']['Detail'],422);
         }
         \Log::info('Invoice created successfully for user:'.$this->user_id);
         $invoice_config = $this->populateConfigFromDb();
@@ -445,10 +446,14 @@ class Quickbooks implements InvoiceContract {
         return $config->config;
     }
 
-    public function getItems() {
+    public function getItems($page_limit = 20) {
         $invoice_config = $this->populateConfigFromDb();
-        $url = $this->base_url.'/v3/company/'.$invoice_config['businessId']."/query?query=SELECT * from Item&minorversion=55 ";
-        $response = Http::withToken($invoice_config['access_token'])->get($url);
+        $url = $this->base_url.'/v3/company/'.$invoice_config['businessId']."/query?query=SELECT * from Item where type = 'Service'&minorversion=55 ";
+        $response = Http::withHeaders([
+                                        'Authorization' => "Bearer {$invoice_config['access_token']}",
+                                        'Content-Type' => 'application/json',
+                                        'Accept' => 'application/json',
+                                    ])->get($url);
 
         if($response->failed()) {
             \Log::error('failed to get items for user_id:'.$this->user_id,["__trace" => $response->json()]);
@@ -460,12 +465,13 @@ class Quickbooks implements InvoiceContract {
 
         if($response->ok()) {
             \Log::info('quickbooks items/products/services retrived successfully for user_id:'.$this->user_id);
-            $xml = simplexml_load_string($response->body());
-            $json = json_encode($xml);
-            $array = json_decode($json,TRUE);            
-            if(!empty($array['QueryResponse'])){
-                return $array['QueryResponse']['Item'];
-            }
+            $results = $response->json();
+
+            return array_map(function($product) {
+                $product['id'] = $product['Id'];
+                $product['name'] = $product['Name'];
+                return $product;
+            },$results['QueryResponse']['Item']);
         }
 
     }

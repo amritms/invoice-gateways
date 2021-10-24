@@ -38,5 +38,11 @@ interface Invoice
      * Create Item or Product
      */
     public function createProduct($input = [], $invoice_number);
+   
+   /**
+    * Get products/services/items
+    */
+     
+    public function getItems($page_limit = 20);
     
 }
