@@ -93,7 +93,9 @@ class Waveapps implements InvoiceContract
             "customerId" => $customer_id,
             "status" => $input['invoice_create_status'] ?? 'SAVED',
             "items" => [
-                'productId' => $product_id
+                'productId' => $product_id,
+                'description' => $input['description'],
+                'unitPrice' => (float ) $input['price']
             ],
             "invoiceNumber" => $input['invoice_number'] ?? "",
         ];
@@ -476,5 +478,23 @@ class Waveapps implements InvoiceContract
 
     public function getProductDetail($item_id) {
 
+    }
+
+    /**
+     * fetch products/service from waveapps
+     */
+
+    public function getItems($page_limit = 20) {
+
+        $variables = [
+            "businessId" => $this->businessId,
+            "page" => 1,
+            "pageSize" => $page_limit
+        ];
+
+        $products = $this->waveapps->products($variables);
+        return array_map(function($product) {
+            return $product['node'];
+        },$products['data']['business']['products']['edges']);
     }
 }

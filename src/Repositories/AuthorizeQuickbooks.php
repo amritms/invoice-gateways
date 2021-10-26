@@ -105,7 +105,11 @@ class AuthorizeQuickbooks implements Authorize {
 
         $config = InvoiceGatewayModel::where('user_id', \Auth::user()->id)->first();
         $oauth2LoginHelper  = new OAuth2LoginHelper($this->config['client_id'],$this->config['client_secret']);
-        $accessTokenObj = $oauth2LoginHelper->refreshAccessTokenWithRefreshToken($config->config['refresh_token']);
+        try {
+            $accessTokenObj = $oauth2LoginHelper->refreshAccessTokenWithRefreshToken($config->config['refresh_token']);
+        } catch (\Throwable $th) {
+            \Redirect::to(route('invoce-gateways.authorize',['invoice_type'=> 'quickbooks']))->send();
+        }
         $accessTokenValue = $accessTokenObj->getAccessToken();
         $refreshTokenValue = $accessTokenObj->getRefreshToken();
         $data = [
