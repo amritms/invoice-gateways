@@ -158,28 +158,33 @@ class AuthorizeFreshbooks implements Authorize{
 
         $response = HTTP::post('https://api.freshbooks.com/auth/oauth/token', $body);
 
-        // refresh token is stored indefinitely, if waveaps returns unauthorized(401) status code, then redirect user to get access token.
-        if($response->failed()){
-            \Redirect::to(route('invoce-gateways.authorize',['invoice_type'=> 'freshbooks']))->send();
+        try {
+                   // refresh token is stored indefinitely, if waveaps returns unauthorized(401) status code, then redirect user to get access token.
+            if($response->failed()){
+                return \Redirect::to(route('invoce-gateways.authorize',['invoice_type'=> 'freshbooks']))->send();
+            }
+
+            $header = [
+                'Content-Type' => 'application/json',
+                'Authorization' => 'Bearer ' . $response->json()['access_token'],
+                'Api-Version' => 'alpha',
+            ];
+            config(['invoice-gateways.freshbooks.access_token' => $response['access_token']]);
+            config(['invoice-gateways.freshbooks.expires_in' => now()->addSeconds($response['expires_in'])]);
+            
+            $invoice_config = \Auth::user()->invoicesConfig()->first();
+            $config = json_decode($invoice_config->config,true);
+
+            $config['refresh_token']=$response['refresh_token'];
+            $config['access_token'] = $response['access_token'];
+            $config['expires_in'] = now()->addSeconds($response['expires_in']);
+            $invoice_config->update([
+                'config'=> json_encode($config)
+            ]);
+            \Log::debug('Token refreshed successfully for user_id:' . auth()->id());
+        } catch (\Throwable $th) {
+            \Log::error([ 'msg'=> 'error on freshbooks while refreshing token','__trace' => $th]);
+            return \Redirect::to(route('invoce-gateways.authorize',['invoice_type'=> 'freshbooks']))->send();
         }
-
-        $header = [
-            'Content-Type' => 'application/json',
-            'Authorization' => 'Bearer ' . $response->json()['access_token'],
-            'Api-Version' => 'alpha',
-        ];
-        config(['invoice-gateways.freshbooks.access_token' => $response['access_token']]);
-        config(['invoice-gateways.freshbooks.expires_in' => now()->addSeconds($response['expires_in'])]);
-        
-        $invoice_config = \Auth::user()->invoicesConfig()->first();
-        $config = json_decode($invoice_config->config,true);
-
-        $config['refresh_token']=$response['refresh_token'];
-        $config['access_token'] = $response['access_token'];
-        $config['expires_in'] = now()->addSeconds($response['expires_in']);
-        $invoice_config->update([
-            'config'=> json_encode($config)
-        ]);
-        \Log::debug('Token refreshed successfully for user_id:' . auth()->id());
     }
 }
