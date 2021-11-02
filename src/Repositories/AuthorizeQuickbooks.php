@@ -107,29 +107,31 @@ class AuthorizeQuickbooks implements Authorize {
         $oauth2LoginHelper  = new OAuth2LoginHelper($this->config['client_id'],$this->config['client_secret']);
         try {
             $accessTokenObj = $oauth2LoginHelper->refreshAccessTokenWithRefreshToken($config->config['refresh_token']);
-        } catch (\Throwable $th) {
-            \Redirect::to(route('invoce-gateways.authorize',['invoice_type'=> 'quickbooks']))->send();
-        }
-        $accessTokenValue = $accessTokenObj->getAccessToken();
-        $refreshTokenValue = $accessTokenObj->getRefreshToken();
-        $data = [
-            'access_token' => $accessTokenObj->getAccessToken(),
-            'refresh_token' => $accessTokenObj->getRefreshToken(),
-            'refresh_token_expires_in' => $accessTokenObj->getRefreshTokenExpiresAt(),
-            'expires_in' => $accessTokenObj->getAccessTokenExpiresAt(),
-            'businessId' => $config->config['businessId'],
-            'incomeAccountId' => $config->config['incomeAccountId'] ?? ''
-        ];
-        
-        config(['invoice-gateways.quickbooks.access_token' => $data['access_token']]);
-        config(['invoice-gateways.quickbooks.expires_in' => $data['expires_in'] ]);
+            $accessTokenValue = $accessTokenObj->getAccessToken();
+            $refreshTokenValue = $accessTokenObj->getRefreshToken();
+            $data = [
+                'access_token' => $accessTokenObj->getAccessToken(),
+                'refresh_token' => $accessTokenObj->getRefreshToken(),
+                'refresh_token_expires_in' => $accessTokenObj->getRefreshTokenExpiresAt(),
+                'expires_in' => $accessTokenObj->getAccessTokenExpiresAt(),
+                'businessId' => $config->config['businessId'],
+                'incomeAccountId' => $config->config['incomeAccountId'] ?? ''
+            ];
+            
+            config(['invoice-gateways.quickbooks.access_token' => $data['access_token']]);
+            config(['invoice-gateways.quickbooks.expires_in' => $data['expires_in'] ]);
 
-        InvoiceGatewayModel::where('user_id', \Auth::user()->id)->update([
-            'config' => $data
-        ]);
-        \Log::debug('Token refreshed successfully for user_id:' . auth()->id());
+            InvoiceGatewayModel::where('user_id', \Auth::user()->id)->update([
+                'config' => $data
+            ]);
+            \Log::debug('Token refreshed successfully for user_id:' . auth()->id());
 
-        return $data;
+            return $data;
+
+    } catch (\Throwable $th) {
+        \Log::error([ 'msg'=> 'error on quickbooks while refreshing token','__trace' => $th]);
+        return \Redirect::to(route('invoce-gateways.authorize',['invoice_type'=> 'quickbooks']))->send();
+    }
     }
 
 

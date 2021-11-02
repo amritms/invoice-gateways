@@ -134,24 +134,29 @@ class AuthorizeWaveapps implements Authorize
             'redirect_uri' => $this->config['graphql_auth_redirect_uri'],
         ]);
 
-        // refresh token is stored indefinitely, if waveaps returns unauthorized(401) status code, then redirect user to get access token.
-        if(in_array($response->status(), [400, 401])){
-            \Redirect::to(route('invoce-gateways.authorize'))->send();
+        try {
+                  // refresh token is stored indefinitely, if waveaps returns unauthorized(401) status code, then redirect user to get access token.
+            if(in_array($response->status(), [400, 401])){
+                return \Redirect::to(route('invoce-gateways.authorize'))->send();
+            }
+
+            $response = $response->json();
+            config(['invoice-gateways.waveapps.access_token' => $response['access_token']]);
+            config(['invoice-gateways.waveapps.expires_in' => now()->addSeconds($response['expires_in'])]);
+
+            InvoiceGatewayModel::where('user_id', \Auth::user()->id)->update([
+                'config' => [
+                    "businessId" => $response['businessId'],
+                    "refresh_token" => $response['refresh_token'],
+                    "access_token" => $response['access_token'],
+                    "expires_in" => now()->addSeconds($response['expires_in'])
+                ]
+            ]);
+
+            \Log::debug('Token refreshed successfully for user_id:' . auth()->id());
+        } catch (\Throwable $th) {
+            \Log::error([ 'msg'=> 'error on waveapps while refreshing token','__trace' => $th]);
+            return \Redirect::to(route('invoce-gateways.authorize'))->send();
         }
-
-        $response = $response->json();
-        config(['invoice-gateways.waveapps.access_token' => $response['access_token']]);
-        config(['invoice-gateways.waveapps.expires_in' => now()->addSeconds($response['expires_in'])]);
-
-        InvoiceGatewayModel::where('user_id', \Auth::user()->id)->update([
-            'config' => [
-                "businessId" => $response['businessId'],
-                "refresh_token" => $response['refresh_token'],
-                "access_token" => $response['access_token'],
-                "expires_in" => now()->addSeconds($response['expires_in'])
-            ]
-        ]);
-
-        \Log::debug('Token refreshed successfully for user_id:' . auth()->id());
     }
 }

@@ -340,7 +340,8 @@ class Freshbooks implements InvoiceContract
             $this->getItems();
         }
 
-        return $this->freshbooks->getResponse($response);
+        $response =  $this->freshbooks->getResponse($response);
+        return $response['tasks'];
     }
 
     public function getProductDetail($item_id){
