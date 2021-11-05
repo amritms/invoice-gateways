@@ -272,16 +272,17 @@ class Waveapps implements InvoiceContract
         $response = HTTP::withHeaders([
             'Authorization' => 'Bearer ' . config('invoice-gateways.waveapps.access_token')
         ])->post($url, $post_data);
+
         if($response->status() !== 200){
-            \Log::error('something went wrong. couldn\'t fetch waveapps account ID  for user_id: ' . $this->user_id, ['_trace' => $response->json()]);
-            return ['success' => false, 'data' => $response];
-        }
-
-        if(isset($response['errors'])){
             \Log::error('something went wrong. couldn\'t fetch account ID  for user_id: ' . $this->user_id, ['_trace' => $response->json()]);
-            return ['success' => false, 'data' => $response];
+            if(isset($response['errors'])){
+                if($this->isTokenExpired($response)) {
+                    \Log::error('waveapps token expired for user_id : ' . $this->user_id);
+                    (new AuthorizeWaveapps( config('invoice-gateways.waveapps')))->refreshToken();
+                }
+                throw FailedException::forInvoiceCreate();
+            }   
         }
-
         $return_result = [];
 
         foreach($response['data']['business']['accounts']['edges'] as $account){
@@ -496,5 +497,9 @@ class Waveapps implements InvoiceContract
         return array_map(function($product) {
             return $product['node'];
         },$products['data']['business']['products']['edges']);
+    }
+
+    public function isTokenExpired($response){
+        return (isset($response['errors'][0]['extensions']['code']) && $response['errors'][0]['extensions']['code'] == 'UNAUTHENTICATED');
     }
 }
