@@ -448,7 +448,7 @@ class Quickbooks implements InvoiceContract {
 
     public function getItems($page_limit = 20) {
         $invoice_config = $this->populateConfigFromDb();
-        $url = $this->base_url.'/v3/company/'.$invoice_config['businessId']."/query?query=SELECT * from Item where type = 'Service'&minorversion=55 ";
+        $url = $this->base_url.'/v3/company/'.$invoice_config['businessId']."/query?query=SELECT * from Item where type = 'Service' maxresults {$page_limit} &minorversion=55 ";
         $response = Http::withHeaders([
                                         'Authorization' => "Bearer {$invoice_config['access_token']}",
                                         'Content-Type' => 'application/json',
