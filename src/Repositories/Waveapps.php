@@ -486,17 +486,27 @@ class Waveapps implements InvoiceContract
      */
 
     public function getItems($page_limit = 20) {
-
         $variables = [
             "businessId" => $this->businessId,
             "page" => 1,
             "pageSize" => $page_limit
         ];
 
-        $products = $this->waveapps->products($variables);
+        $response = $this->waveapps->products($variables);
+        if(isset($response['errors'])) {
+            // \Log::error('Something went wrong while fetching waveapps items for user_id: ' . $this->user_id, ['_trace' => $response]);
+            if($this->isTokenExpired($response)) {
+                (new AuthorizeWaveapps( config('invoice-gateways.waveapps')))->refreshToken();
+                return $this->getItems($page_limit);
+            }
+            throw FailedException::forInvoiceCreate("failed to get items");
+            
+        }
+
+        $products = $response['data']['business']['products']['edges'];
         return array_map(function($product) {
             return $product['node'];
-        },$products['data']['business']['products']['edges']);
+        },$products);
     }
 
     public function isTokenExpired($response){
