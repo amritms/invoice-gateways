@@ -486,13 +486,47 @@ class Waveapps implements InvoiceContract
      */
 
     public function getItems($page_limit = 20) {
-        $variables = [
-            "businessId" => $this->businessId,
-            "page" => 1,
-            "pageSize" => $page_limit
+        // $variables = [
+        //     "businessId" => $this->businessId,
+        //     "page" => 1,
+        //     "pageSize" => $page_limit,
+        //     "isSold" => true
+        // ];
+
+        // $response = $this->waveapps->products($variables);
+
+        $url = 'https://gql.waveapps.com/graphql/public';
+        $post_data = [ "query" => 'query ($businessId: ID!, $page: Int!, $pageSize: Int!,$isSold:Boolean) {
+            business(id: $businessId) {
+              id
+              products(page: $page, pageSize: $pageSize, isSold: $isSold) {
+                pageInfo {
+                  currentPage
+                  totalPages
+                  totalCount
+                }
+                edges {
+                  node  {
+                    id
+                    name
+          
+                  }
+                }
+              }
+            }
+          } ',
+            'variables' => [
+                "businessId" => $this->businessId,
+                'page'=> 1,
+                'pageSize' => $page_limit,
+                'isSold' => true
+            ]
         ];
 
-        $response = $this->waveapps->products($variables);
+        $response = HTTP::withHeaders([
+            'Authorization' => 'Bearer ' . config('invoice-gateways.waveapps.access_token')
+        ])->post($url, $post_data);
+        \Log::info($response);
         if(isset($response['errors'])) {
             \Log::error('Something went wrong while fetching waveapps items for user_id: ' . $this->user_id, ['_trace' => $response]);
             if($this->isTokenExpired($response)) {
