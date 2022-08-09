@@ -44,5 +44,6 @@ interface Invoice
     */
      
     public function getItems($page_limit = 20);
+    public function syncCustomers();
     
 }

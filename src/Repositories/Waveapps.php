@@ -18,7 +18,7 @@ class Waveapps implements InvoiceContract
     public $state;
     public $redirect_uri = '';
 
-    protected $graphql_url;
+    protected $graphql_url = 'https://gql.waveapps.com/graphql/public';
     protected $user_id;
     // customer's business id
     public $businessId;
@@ -44,11 +44,16 @@ class Waveapps implements InvoiceContract
         $this->populateConfigFromDb();
 
         $this->redirect_uri = url('waveapps/redirect-back');
+        $this->graphql_url = $graphqlUrl;
         $this->state = 'csrf_protection_' . $this->user_id;
         $config = config('invoice-gateways.waveapps');
 
         if ($config['access_token'] == null || (! empty($config['expires_in']) && now()->greaterThanOrEqualTo($config['expires_in']))){
             (new AuthorizeWaveapps($config))->refreshToken();
+        }
+
+        if(!Auth::check()) {
+            config(['invoice-gateways.waveapps.access_token' => '123']);
         }
 
         $this->waveapps = new \Amritms\WaveappsClientPhp\Waveapps(null, null, null, config('invoice-gateways.waveapps'));
@@ -204,7 +209,6 @@ class Waveapps implements InvoiceContract
      */
     public function getAllProducts()
     {
-        $url = 'https://gql.waveapps.com/graphql/public';
         $variables = [
             "businessId" => $this->businessId,
             'page'=> 1,
@@ -241,7 +245,7 @@ class Waveapps implements InvoiceContract
      */
     public function getAccountId()
     {
-        $url = 'https://gql.waveapps.com/graphql/public';
+        $url = $this->graphql_url;
         $post_data = [ "query" => 'query ($businessId: ID!) {
           business(id: $businessId) {
             id
@@ -393,9 +397,10 @@ class Waveapps implements InvoiceContract
      */
     public function send($input = [])
     {
+        $customer = $this->_getInvoiceCustomer(($input['invoice_number']));
         $input = [
             "invoiceId" => $input['invoice_id'],
-            "to" => $input['email'],
+            "to" => $customer['email'] ?? $input['email'],
             "subject" => $input['subject'] ?? '',
             "message" => $input['message'] ?? '',
             "attachPDF" => true
@@ -462,6 +467,9 @@ class Waveapps implements InvoiceContract
      */
     private function populateConfigFromDb()
     {
+        if(!$this->user_id) {
+            return;
+        }
         $config = InvoiceGatewayModel::where('user_id', $this->user_id)->select('config')->firstOrFail();
 
         $this->businessId      = $config['config']['businessId'] ?? null;
@@ -486,16 +494,8 @@ class Waveapps implements InvoiceContract
      */
 
     public function getItems($page_limit = 20) {
-        // $variables = [
-        //     "businessId" => $this->businessId,
-        //     "page" => 1,
-        //     "pageSize" => $page_limit,
-        //     "isSold" => true
-        // ];
 
-        // $response = $this->waveapps->products($variables);
-
-        $url = 'https://gql.waveapps.com/graphql/public';
+        $url = $this->graphql_url;
         $post_data = [ "query" => 'query ($businessId: ID!, $page: Int!, $pageSize: Int!,$isSold:Boolean) {
             business(id: $businessId) {
               id
@@ -526,7 +526,6 @@ class Waveapps implements InvoiceContract
         $response = HTTP::withHeaders([
             'Authorization' => 'Bearer ' . config('invoice-gateways.waveapps.access_token')
         ])->post($url, $post_data);
-        \Log::info($response);
         if(isset($response['errors'])) {
             \Log::error('Something went wrong while fetching waveapps items for user_id: ' . $this->user_id, ['_trace' => $response]);
             if($this->isTokenExpired($response)) {
@@ -545,5 +544,61 @@ class Waveapps implements InvoiceContract
 
     public function isTokenExpired($response){
         return (isset($response['errors'][0]['extensions']['code']) && $response['errors'][0]['extensions']['code'] == 'UNAUTHENTICATED');
+    }
+
+    private function _getInvoiceCustomer($invoice_number) {
+        $query = ['query' => 'query($businessId: ID!, $page: Int!, $pageSize: Int!, $invoiceNumber: String) {
+            business(id: $businessId) {
+              id
+              isClassicInvoicing
+              invoices(page: $page, pageSize: $pageSize, invoiceNumber: $invoiceNumber) {
+                pageInfo {
+                  currentPage
+                  totalPages
+                  totalCount
+                }
+                edges {
+                  node {
+                    id
+                    createdAt
+                    modifiedAt
+                    pdfUrl
+                    viewUrl
+                    status
+                    title
+                    subhead
+                    invoiceNumber
+                    invoiceDate
+                    poNumber
+                    customer {
+                      id
+                      name
+                      email
+                    }
+                  }
+                }
+              }
+            }
+          }',
+        'variables' => [
+            'businessId' => $this->businessId,
+            'page' => 1,
+            'pageSize' => 20,
+            'invoiceNumber' => "{$invoice_number}"
+        ] ];
+        $response = HTTP::withHeaders([
+            'Authorization' => 'Bearer ' . config('invoice-gateways.waveapps.access_token')
+        ])->post($this->graphql_url, $query);
+        if(isset($response['errors'])) {
+            \Log::error('Something went wrong while fetching waveapps invoices for user_id: ' . $this->user_id, ['_trace' => $response]);
+            if($this->isTokenExpired($response)) {
+                (new AuthorizeWaveapps( config('invoice-gateways.waveapps')))->refreshToken();
+                return $this->getItems($invoice_number);
+            }
+            throw FailedException::forInvoiceCreate("failed to get items");
+            
+        }
+        return data_get($response,'data.business.invoices.edges.0.node.customer');
+
     }
 }
