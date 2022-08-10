@@ -397,7 +397,7 @@ class Waveapps implements InvoiceContract
      */
     public function send($input = [])
     {
-        $customer = $this->_getInvoiceCustomer(($input['invoice_number']));
+        $customer = $this->getInvoiceCustomer(($input['invoice_number']));
         $input = [
             "invoiceId" => $input['invoice_id'],
             "to" => $customer['email'] ?? $input['email'],
@@ -546,7 +546,7 @@ class Waveapps implements InvoiceContract
         return (isset($response['errors'][0]['extensions']['code']) && $response['errors'][0]['extensions']['code'] == 'UNAUTHENTICATED');
     }
 
-    private function _getInvoiceCustomer($invoice_number) {
+    private function getInvoiceCustomer($invoice_number) {
         $query = ['query' => 'query($businessId: ID!, $page: Int!, $pageSize: Int!, $invoiceNumber: String) {
             business(id: $businessId) {
               id
