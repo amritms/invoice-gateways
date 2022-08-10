@@ -43,8 +43,12 @@ class InvoiceGatewayController implements Invoice
 
     public function createProduct($input = [],$invoice_number){}
 
-    public function syncContacts()
+    public function syncCustomers()
     {
-        return $this->invoice->syncContacts();
+        return $this->invoice->syncCustomers();
+    }
+
+    public function getItems($page_limit = 20) {
+        return $this->invoice->getItems();
     }
 }

@@ -69,15 +69,15 @@ class InvoiceGatewaysServiceProvider extends ServiceProvider
         $invoice_type = isset($invoice_type) ? $invoice_type :  config('invoice-gateways.payment_type');
 
         $this->app->bind(Invoice::class, function ($app){
-            $user_invoice_type = auth()->user()->invoicesConfig->invoice_type;
+            $user_invoice_type = optional(optional(auth()->user())->invoicesConfig)->invoice_type ?? 'waveapps';
             return $this->resolveInvoice($user_invoice_type);
         });
 
         $this->app->bind(Authorize::class, function ($app) use($invoice_type){
             switch($invoice_type){
                 //in case of paypal
-                case 'paypal' : return new AuthorizePaypal();
-                    break;
+                // case 'paypal' : return new AuthorizePaypal();
+                //     break;
 
                 case 'waveapps' : return new AuthorizeWaveapps(config('invoice-gateways.waveapps'));
                     break;
@@ -102,7 +102,7 @@ class InvoiceGatewaysServiceProvider extends ServiceProvider
             case 'paypal' : return new Paypal();
                 break;
 
-            case 'waveapps' : return new Waveapps(null, null, null, config('invoice-gateways.waveapps'));
+            case 'waveapps' : return new Waveapps('https://gql.waveapps.com/graphql/public', null, null, config('invoice-gateways.waveapps'));
                 break;
 
             //in case of freshbooks
