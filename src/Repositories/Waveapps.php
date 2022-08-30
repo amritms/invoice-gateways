@@ -397,16 +397,19 @@ class Waveapps implements InvoiceContract
      */
     public function send($input = [])
     {
-        $customer = $this->getInvoiceCustomer(($input['invoice_number']));
+        $waveapps_user = $this->getCurrentUser();
+
         $input = [
             "invoiceId" => $input['invoice_id'],
-            "to" => $customer['email'] ?? $input['email'],
+            "to" => [$input['email']],
             "subject" => $input['subject'] ?? '',
             "message" => $input['message'] ?? '',
-            "attachPDF" => true
+            "attachPDF" => true,
+            'fromAddress' => $waveapps_user['defaultEmail'] ?? ''
         ];
 
         $variables = ['input' => $input];
+        
         $response = $this->waveapps->invoiceSend($variables, 'InvoiceSendInput');
 
         if(isset($response['data']['invoiceSend']['didSucceed']) && $response['data']['invoiceSend']['didSucceed'] == true){
@@ -600,5 +603,10 @@ class Waveapps implements InvoiceContract
         }
         return data_get($response,'data.business.invoices.edges.0.node.customer');
 
+    }
+
+    private function getCurrentUser() {
+        $user = $this->waveapps->user();
+        return data_get($user,'data.user');
     }
 }
