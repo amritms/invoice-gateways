@@ -18,12 +18,12 @@
     "require": {
         "php": "^7.2",
         "ext-json": "*",
-        "illuminate/support": "^7.0",
-        "illuminate/database": "^6.18|^7.0",
-        "paypal/rest-api-sdk-php": "^1.14",
         "amritms/waveapps-client-php": "^0.2",
-        "quickbooks/v3-php-sdk": "5.4.6",
-        "sabinks/freshbooks-client-php":"^0.2.1"
+        "illuminate/database": "^6.18|^7.0",
+        "illuminate/support": "^7.0",
+        "paypal/rest-api-sdk-php": "^1.14",
+        "quickbooks/v3-php-sdk": "^6.0",
+        "sabinks/freshbooks-client-php": "^0.2.1"
     },
     "require-dev": {
         "orchestra/testbench": "^5.0",
