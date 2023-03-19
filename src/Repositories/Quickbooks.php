@@ -27,6 +27,13 @@ class Quickbooks implements InvoiceContract
     protected $user_id;
     protected $config;
     protected $base_url;
+    protected string $client_secret;
+    protected string $businessId;
+    protected string $refresh_token;
+    protected string $access_token;
+    protected $expires_in;
+    protected $incomeAccountId;
+
     const API_VERSION = 65;
 
     public function __construct(array $config = [])
@@ -105,7 +112,6 @@ class Quickbooks implements InvoiceContract
         $invoice = Invoice::create($variables);
         $resultingInvoice = $this->dataService->Add($invoice);
         $error = $this->dataService->getLastError();
-
         if ($error) {
 
             Log::error('failed to create invoice for job:' . $input['job']['id'], ['_trace' => $error]);

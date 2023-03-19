@@ -3,28 +3,33 @@
 namespace Amritms\InvoiceGateways\Repositories;
 
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Amritms\InvoiceGateways\Models\Contact;
 use Sabinks\FreshbooksClientPhp\FreshbooksClientPhp;
 use Amritms\InvoiceGateways\Exceptions\FailedException;
 use Amritms\InvoiceGateways\Exceptions\InvalidConfiguration;
 use Amritms\InvoiceGateways\Repositories\AuthorizeFreshbooks;
+use Amritms\InvoiceGateways\Exceptions\UnauthenticatedException;
 use Amritms\InvoiceGateways\Contracts\Invoice as InvoiceContract;
 use Amritms\InvoiceGateways\Models\InvoiceGateway as InvoiceGatewayModel;
 
 class Freshbooks implements InvoiceContract
 {
-    public $client_id;
-    public $client_secret;
-    public $state;
-    public $redirect_uri = '';
+    protected $client_id;
+    protected $client_secret;
+    protected $state;
+    protected $redirect_uri = '';
 
     protected $user_id;
-    public $businessId;
-    public $auth_token;
-    public $refresh_token;
-    public $incomeAccountId;
-    public $invoice_id;
+    protected $businessId;
+    protected $auth_token;
+    protected $refresh_token;
+    protected $access_token;
+    protected $incomeAccountId;
+    protected $invoice_id;
+    protected $expires_in;
     private $freshbooks;
 
     function __construct(array $config = [])
@@ -38,7 +43,7 @@ class Freshbooks implements InvoiceContract
             throw InvalidConfiguration::ClientSecretNotSpecified();
         }
 
-        $this->user_id = \Auth::id();
+        $this->user_id = Auth::id();
         $this->populateConfigFromDb();
         $this->state = 'csrf_protection_' . $this->user_id;
         $config = config('invoice-gateways.freshbooks');
@@ -87,12 +92,12 @@ class Freshbooks implements InvoiceContract
 
         if ($data->failed()) {
             $error = $data['response']['errors'][0];
-            \Log::error('Could\'t create freshbooks invoice. user_id:' . $this->user_id, ['data' => $error]);
+            Log::error('Could\'t create freshbooks invoice. user_id:' . $this->user_id, ['data' => $error]);
             throw FailedException::forInvoiceCreate($error['message'], 422);
         } else {
             $result = $data['response']['result'];
             if (isset($result['invoice'])) {
-                \Log::debug('Freshbooks invoice created successfully for user_id: ' . $this->user_id, ['_trace' => $result]);
+                Log::debug('Freshbooks invoice created successfully for user_id: ' . $this->user_id, ['_trace' => $result]);
                 $invoice = $result['invoice'];
 
                 return [
@@ -147,7 +152,7 @@ class Freshbooks implements InvoiceContract
         $response = $this->freshbooks->invoiceSend($input);
 
         if (isset($response['invoice'])) {
-            \Log::debug('Freshbooks Invoice sent successfully for user_id:' . $this->user_id);
+            Log::debug('Freshbooks Invoice sent successfully for user_id:' . $this->user_id);
             request()->session()->flash('message', 'Invoice sent successfully.');
             $invoice = $response['invoice'];
 
@@ -164,13 +169,13 @@ class Freshbooks implements InvoiceContract
         if (isset($response[0]['errno']) && $response[0]['errno'] == '1003') {
             (new AuthorizeFreshbooks(config('invoice-gateways.freshbooks')))->refreshToken();
             request()->session()->flash('message', 'Something went wrong, Invoice couldn\'t be sent. Try again');
-            \Log::error('Try again. Something went wrong while sending freshbooks invoice for user_id: ' . $this->user_id, ['_trace' => $response]);
+            Log::error('Try again. Something went wrong while sending freshbooks invoice for user_id: ' . $this->user_id, ['_trace' => $response]);
 
             throw UnauthenticatedException::forInvoiceSend();
         }
 
         request()->session()->flash('message', 'Something went wrong, Invoice couldn\'t be sent');
-        \Log::error('Something went wrong while sending freshbooks invoice for user_id: ' . $this->user_id, ['_trace' => $response]);
+        Log::error('Something went wrong while sending freshbooks invoice for user_id: ' . $this->user_id, ['_trace' => $response]);
 
         throw FailedException::forInvoiceSend();
     }
@@ -189,22 +194,22 @@ class Freshbooks implements InvoiceContract
 
                 return [$customer['email'] => $customer['id']];
             });
-            $contacts = Contact::whereIn('email', $emails)->where('user_id', \Auth::id())->get();
+            $contacts = Contact::whereIn('email', $emails)->where('user_id', Auth::id())->get();
 
-            \Log::debug('Freshbooks customer import start for user_id:' . $this->user_id);
+            Log::debug('Freshbooks customer import start for user_id:' . $this->user_id);
 
             $contacts->map(function ($contact) use ($customers_email_id_key_pair) {
                 if (isset($customers_email_id_key_pair[$contact->email])) {
                     $contact->customer_id = $customers_email_id_key_pair[$contact->email];
                     $contact->save();
-                    \Log::debug($contact->email);
+                    Log::debug($contact->email);
                 }
 
                 return true;
             });
-            (new InvoiceGatewayModel)->where(['user_id' => \Auth::id()])->update(['contact_sync_at' => now()]);
+            (new InvoiceGatewayModel)->where(['user_id' => Auth::id()])->update(['contact_sync_at' => now()]);
 
-            \Log::debug('Freshbooks customer import completed for user_id:' . $this->user_id);
+            Log::debug('Freshbooks customer import completed for user_id:' . $this->user_id);
 
             return ['success' => true, 'data' => $contacts];
         } catch (\Exception $exception) {
@@ -255,7 +260,7 @@ class Freshbooks implements InvoiceContract
 
         if ($data->ok()) {
             $response = $data->json()['response']['result'];
-            \Log::debug('Freshbooks Product created successfully for user_id:' . $this->user_id, ['_trace' => $response]);
+            Log::debug('Freshbooks Product created successfully for user_id:' . $this->user_id, ['_trace' => $response]);
 
             return [
                 'id' => $response['task']['id'],
@@ -265,11 +270,11 @@ class Freshbooks implements InvoiceContract
         } else {
             $error = $data->json()['response']['errors'][0];
             if ($error['errno'] == 1003) {
-                \Log::debug('Token generation from refresh token for user_id:' . $this->user_id, ['_trace' => $error]);
+                Log::debug('Token generation from refresh token for user_id:' . $this->user_id, ['_trace' => $error]);
                 (new AuthorizeFreshbooks(config('invoice-gateways.freshbooks')))->refreshToken();
                 throw UnauthenticatedException::forCustomerAll();
             } else {
-                \Log::error('Product already created' . $this->user_id, ['_trace' => $error]);
+                Log::error('Product already created' . $this->user_id, ['_trace' => $error]);
                 $message = $input['message'] ?? 'Fresbooks(FB) duplicate item message: FB does not support duplicate/repeated items. Please update the Job Title for this invoice. Save. And then try again.';
                 throw FailedException::forProductCreate($message, 422);
                 // throw FailedException::forProductCreate($error['message'], 422);
@@ -304,13 +309,13 @@ class Freshbooks implements InvoiceContract
         $response = $this->freshbooks->customers($variables);
 
         if (isset($response[0]['errno']) && $response[0]['errno'] ==  1003) {
-            \Log::debug('Couldn\'t list freshbooks customers for user_id:' . $this->user_id, ['_trace' => $response]);
+            Log::debug('Couldn\'t list freshbooks customers for user_id:' . $this->user_id, ['_trace' => $response]);
             (new AuthorizeFreshbooks(config('invoice-gateways.freshbooks')))->refreshToken();
 
             throw UnauthenticatedException::forCustomerAll();
         }
         if (isset($response['clients']) && $response['clients'] !== null) {
-            \Log::debug('Customer listed freshbooks successfully for user_id:' . $this->user_id, ['_trace' => $response]);
+            Log::debug('Customer listed freshbooks successfully for user_id:' . $this->user_id, ['_trace' => $response]);
             $return_result = [];
             foreach ($response['clients'] as $customer) {
                 $return_result[] = [
@@ -323,7 +328,7 @@ class Freshbooks implements InvoiceContract
             return ['success' => true, 'data' => $return_result];
         }
 
-        \Log::debug('Couldn\'t list freshbooks customers for user_id:' . $this->user_id, ['_trace' => $response]);
+        Log::debug('Couldn\'t list freshbooks customers for user_id:' . $this->user_id, ['_trace' => $response]);
 
         throw FailedException::forCustomerAll();
     }

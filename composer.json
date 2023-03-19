@@ -16,19 +16,21 @@
         }
     ],
     "require": {
-        "php": "^7.2",
+        "php": "^7.4|^8.0",
         "ext-json": "*",
-        "amritms/waveapps-client-php": "^0.2",
-        "illuminate/database": "^6.18|^7.0",
-        "illuminate/support": "^7.0",
+        "amritms/waveapps-client-php": "^0.3.1",
+        "guzzlehttp/guzzle": "^7.0.1",
+        "illuminate/database": "^7.0|^8.0|^9.0|^10.0",
+        "illuminate/support": "7.0|^8.0|^9.0|^10.0",
         "paypal/rest-api-sdk-php": "^1.14",
         "quickbooks/v3-php-sdk": "^6.0",
-        "sabinks/freshbooks-client-php": "^0.2.1"
+        "sabinks/freshbooks-client-php": "0.3.4"
     },
     "require-dev": {
-        "orchestra/testbench": "^5.0",
+        "orchestra/testbench": "^6.20.0",
         "phpunit/phpunit": "^9.0"
     },
+    "minimum-stability":"dev",
     "autoload": {
         "psr-4": {
             "Amritms\\InvoiceGateways\\": "src/"
