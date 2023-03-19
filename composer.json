@@ -16,7 +16,7 @@
         }
     ],
     "require": {
-        "php": "^7.3|^8.0",
+        "php": "^7.4|^8.0",
         "ext-json": "*",
         "amritms/waveapps-client-php": "^0.3.1",
         "guzzlehttp/guzzle": "^7.0.1",
@@ -24,7 +24,7 @@
         "illuminate/support": "7.0|^8.0|^9.0|^10.0",
         "paypal/rest-api-sdk-php": "^1.14",
         "quickbooks/v3-php-sdk": "^6.0",
-        "sabinks/freshbooks-client-php": "dev-version-comp"
+        "sabinks/freshbooks-client-php": "0.3.4"
     },
     "require-dev": {
         "orchestra/testbench": "^6.20.0",
@@ -58,14 +58,5 @@
                 "InvoiceGateways": "Amritms\\InvoiceGateways\\Facades"
             }
         }
-    },
-    "repositories": [
-        {
-            "type": "path",
-            "url": "../../sabinks/freshbooks-client-php",
-            "options": {
-                "symlink": true
-            }
-        }
-    ]
+    }
 }

@@ -102,7 +102,7 @@ class InvoiceGatewaysServiceProvider extends ServiceProvider
             case 'paypal' : return new Paypal();
                 break;
 
-            case 'waveapps' : return new Waveapps('https://gql.waveapps.com/graphql/public', null, null, config('invoice-gateways.waveapps'));
+            case 'waveapps' : return new Waveapps('https://gql.waveapps.com/graphql/public', config('invoice-gateways.waveapps'));
                 break;
 
             //in case of freshbooks
