@@ -11,6 +11,7 @@ use Amritms\InvoiceGateways\Exceptions\InvalidConfiguration;
 use Amritms\InvoiceGateways\Exceptions\UnauthenticatedException;
 use Amritms\InvoiceGateways\Contracts\Invoice as InvoiceContract;
 use Amritms\InvoiceGateways\Models\InvoiceGateway as InvoiceGatewayModel;
+use Carbon\Carbon;
 
 class Waveapps implements InvoiceContract
 {
@@ -27,7 +28,7 @@ class Waveapps implements InvoiceContract
     public string $refresh_token;
     private $incomeAccountId = '';
     private string $access_token;
-    private int $expires_in;
+    private $expires_in;
     private  $waveapps;
 
     public function __construct($graphqlUrl = null, array $config = [])
@@ -50,7 +51,7 @@ class Waveapps implements InvoiceContract
         $this->state = 'csrf_protection_' . $this->user_id;
         $config = config('invoice-gateways.waveapps');
 
-        if ($config['access_token'] == null || (! empty($config['expires_in']) && now()->greaterThanOrEqualTo($config['expires_in']))){
+        if ($config['access_token'] == null || (! empty($config['expires_in']) && now()->greaterThanOrEqualTo(Carbon::parse($config['expires_in'])))){
             (new AuthorizeWaveapps($config))->refreshToken();
         }
 
@@ -200,6 +201,7 @@ class Waveapps implements InvoiceContract
 
         return ['success' => true, 'data' => $contacts];
     }catch (\Exception $exception){
+        dd($exception);
             throw FailedException::forCustomerSync($exception->getMessage());
         }
     }
@@ -480,14 +482,13 @@ class Waveapps implements InvoiceContract
         $this->refresh_token   = $config['config']['refresh_token'] ?? null;
         $this->incomeAccountId = $config['config']['incomeAccountId'] ?? null;
         $this->access_token    = $config['config']['access_token'] ?? null;
-        $this->expires_in      = $config['config']['expires_in'] ?? null;
-
+        $this->expires_in      = Carbon::parse($config['config']['expires_in']) ?? null;
 
         config(['invoice-gateways.waveapps.businessId' => $this->businessId]);
         config(['invoice-gateways.waveapps.refresh_token' => $this->refresh_token]);
         config(['invoice-gateways.waveapps.incomeAccountId' => $this->incomeAccountId]);
         config(['invoice-gateways.waveapps.access_token' => $this->access_token]);
-        config(['invoice-gateways.waveapps.expires_in' => intval($this->expires_in)]);
+        config(['invoice-gateways.waveapps.expires_in' => $this->expires_in]);
     }
 
     public function getProductDetail($item_id) {
