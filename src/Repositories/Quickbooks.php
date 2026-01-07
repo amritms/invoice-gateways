@@ -221,26 +221,75 @@ class Quickbooks implements InvoiceContract
         return ['success' => true];
     }
 
+
     public function createCustomer($input = [])
     {
-        $customer = Customer::create($input);
         $invoice_config = InvoiceGatewayModel::whereUserId(auth()->id())->first();
-        $access_token_expiration_time = Carbon::parse($invoice_config->config['expires_in'])->subSeconds(60);
-        $now = Carbon::now();
-
-        $resultingCustomer = $this->dataService->Add($customer);
-
+        $display_name = $input['DisplayName'];
+        
+        $vendor_query = "SELECT * from Vendor WHERE DisplayName='{$display_name}'";
+        
+        $vendor_query_result = $this->dataService->Query($vendor_query);
         $error = $this->dataService->getLastError();
         if ($error) {
             if ($error->getHttpStatusCode() == 401) {
                 (new AuthorizeQuickbooks(config('invoice-gateways.quickbooks')))->refreshToken();
             }
-            throw FailedException::forInvoiceCreate();
+            throw FailedException::forInvoiceCreate('Something went wrong when checking for vendor record');
         }
+
+        $employee_query = "SELECT * FROM Employee WHERE DisplayName = '{$display_name}'";
+        $employee_query_result = $this->dataService->Query($employee_query);
+        $error = $this->dataService->getLastError();
+        if($error) {
+            if($error->getHttpStatusCode() == 401) {
+                (new AuthorizeQuickbooks(config('invoice-gateways.quickbooks')))->refreshToken();
+            }
+            throw FailedException::forInvoiceCreate('Something went wrong when checking for employee record');
+        }
+        if(!empty($employee_query_result) && is_array($employee_query_result)) {
+            $customer_query = "SELECT * FROM Customer WHERE DisplayName = '{$display_name}'";
+            $customer_query_result = $this->dataService->Query($customer_query);
+
+            if(!empty($customer_query_result) && is_array($customer_query_result)) {
+                $customer_result = $customer_query_result[0];
+                return [
+                    'id' => $customer_result->Id,
+                ];
+            }
+            else {
+                $input['DisplayName'] .=  '(C)';
+            }
+        }
+
+        if(!empty($vendor_query_result) && is_array($vendor_query_result)) {
+            $customer_query = "SELECT * FROM Customer WHERE DisplayName = '{$display_name}'";
+            $customer_query_result = $this->dataService->Query($customer_query);
+
+            if(!empty($customer_query_result) && is_array($customer_query_result)) {
+                $customer_result = $customer_query_result[0];
+                return [
+                    'id' => $customer_result->Id,
+                ];
+            }
+            else {
+                $input['DisplayName'] .=  '(C)';
+            }
+        }
+            $customer = Customer::create($input);
+            $resultingCustomer = $this->dataService->Add($customer);
+            $error = $this->dataService->getLastError();
+            if ($error) {
+                if ($error->getHttpStatusCode() == 401) {
+                    (new AuthorizeQuickbooks(config('invoice-gateways.quickbooks')))->refreshToken();
+                }
+                throw FailedException::forInvoiceCreate();
+            }
 
         return [
             'id' => $resultingCustomer->Id
         ];
+        
     }
 
     public function createProduct($input = [], $invoice_number)
@@ -268,7 +317,6 @@ class Quickbooks implements InvoiceContract
             Log::info($error->getHttpStatusCode());
             Log::error('failed to create product for user_id:' . $this->user_id, ['_trace' => $error->getResponseBody()]);
             Log::info(['message' => $message, 'input_message' => $input['message']]);
-            dd($error->getHttpStatusCode());
             if ($error->getHttpStatusCode() == 401) {
                 (new AuthorizeQuickbooks(config('invoice-gateways.quickbooks')))->refreshToken();
                 throw UnauthenticatedException::forInvoiceCreate();
@@ -406,7 +454,8 @@ class Quickbooks implements InvoiceContract
 
             return $allCustomers;
         } catch (\Throwable $th) {
-            dd($th);
+            throw FailedException::forCustomerAll();
+
         }
     }
 
