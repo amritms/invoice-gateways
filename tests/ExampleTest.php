@@ -3,6 +3,7 @@
 namespace Amritms\InvoiceGateways\Tests;
 
 use Orchestra\Testbench\TestCase;
+use PHPUnit\Framework\Attributes\Test;
 use Amritms\InvoiceGateways\InvoiceGatewaysServiceProvider;
 
 class ExampleTest extends TestCase
@@ -13,7 +14,7 @@ class ExampleTest extends TestCase
         return [InvoiceGatewaysServiceProvider::class];
     }
     
-    /** @test */
+    #[Test]
     public function true_is_true()
     {
         $this->assertTrue(true);
