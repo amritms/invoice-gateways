@@ -6,7 +6,6 @@ use Illuminate\Support\ServiceProvider;
 //use Amritms\WaveappsClientPhp\Waveapps;
 use Amritms\InvoiceGateways\Contracts\Invoice;
 use Amritms\InvoiceGateways\Contracts\Authorize;
-use Amritms\InvoiceGateways\Repositories\Paypal;
 use Amritms\InvoiceGateways\Repositories\Waveapps;
 use Amritms\InvoiceGateways\Repositories\Freshbooks;
 use Amritms\InvoiceGateways\Repositories\Quickbooks;
@@ -98,10 +97,6 @@ class InvoiceGatewaysServiceProvider extends ServiceProvider
 
     private function resolveInvoice($invoice_type){
         switch($invoice_type){
-            //in case of paypal
-            case 'paypal' : return new Paypal();
-                break;
-
             case 'waveapps' : return new Waveapps('https://gql.waveapps.com/graphql/public', config('invoice-gateways.waveapps'));
                 break;
 
