@@ -19,12 +19,11 @@ use Amritms\InvoiceGateways\Repositories\AuthorizeQuickbooks;
 use Amritms\InvoiceGateways\Exceptions\UnauthenticatedException;
 use Amritms\InvoiceGateways\Contracts\Invoice as InvoiceContract;
 use Amritms\InvoiceGateways\Models\InvoiceGateway as InvoiceGatewayModel;
-use Illuminate\Support\Facades\Storage;
 
 class Quickbooks implements InvoiceContract
 {
 
-    protected DataService $dataService;
+    protected $dataService;
     protected $user_id;
     protected $config;
     protected $base_url;
@@ -35,7 +34,7 @@ class Quickbooks implements InvoiceContract
     protected $expires_in;
     protected $incomeAccountId;
 
-    const API_VERSION = 75;
+    const API_VERSION = 65;
 
     public function __construct(array $config = [])
     {
@@ -77,141 +76,83 @@ class Quickbooks implements InvoiceContract
     public function create($input = [])
     {
 
-        try {
-            $message = $this->getInvoiceMessage();
-            $variables = [
-                'Line' => [
-                    [
-                        "Amount" => $input['price'],
-                        "Description" => $input['description'],
-                        'DetailType' => "SalesItemLineDetail",
-                        "SalesItemLineDetail" => [
-                            "ItemRef" => [
-                                "value" => $input['product_id'],
-                            ],
-                            "UnitPrice" => $input['price'],
-                            'Qty' => 1,
-                            'ServiceDate' => $input['job']['jobdate']
+        $message = $this->getInvoiceMessage();
+        $variables = [
+            'Line' => [
+                [
+                    "Amount" => $input['price'],
+                    "Description" => $input['description'],
+                    'DetailType' => "SalesItemLineDetail",
+                    "SalesItemLineDetail" => [
+                        "ItemRef" => [
+                            "value" => $input['product_id'],
                         ],
+                        "UnitPrice" => $input['price'],
+                        'Qty' => 1,
+                        'ServiceDate' => $input['job']['jobdate']
+                    ],
 
-                    ]
-                ],
-
-                'CustomerRef' => [
-                    'value' => $input['customer_id'],
-                ],
-                'BillEmail' => [
-                    'Address' => $input['billing_address']
-                ],
-                'CustomerMemo' => $message,
-                'AllowOnlineCreditCardPayment' => true,
-                'AllowOnlineACHPayment' => true
-            ];
-
-            if (isset($input['invoice_number'])) {
-                $variables['DocNumber'] = $input['invoice_number'];
-            }
-            $invoice = Invoice::create($variables);
-            $this->dataService->Add($invoice);
-
-            $error = $this->dataService->getLastError();
-            if ($error) {
-
-                Log::error('failed to create invoice for job:' . $input['job']['id'], ['_trace' => $error]);
-                Log::error('failed to create invoice for user:' . $this->user_id, ['_trace' => $error]);
-                if ($error->getHttpStatusCode() == 401) {
-                    (new AuthorizeQuickbooks(config('invoice-gateways.quickbooks')))->refreshToken();
-                    throw UnauthenticatedException::forInvoiceCreate();
-                }
-
-                $err = $this->parseXMLToJSON($error->getResponseBody());
-                \Log::error(['error' => $error, 'response' => $error->getResponseBody()]);
-                throw FailedException::forInvoiceCreate($err['Fault']['Error']['Detail'], 422);
-            }
-            $invoice_config = $this->populateConfigFromDb();
-            // THIS PIECE OF CODE WAS ADDED SINCE CREATE INVOICE DID NOT RETURNED ANY INVOICE ID
-            $url =  "{$this->base_url}/v3/company/{$invoice_config['businessId']}/query";
-            $query = "SELECT * FROM Invoice ORDERBY MetaData.CreateTime DESC MAXRESULTS 1";
-            $response = Http::withToken($invoice_config['access_token'])->withHeaders([
-                'Accept' => 'application/json'
-            ])->get($url, [
-                'query' => $query,
-                'minorversion' => self::API_VERSION
-            ]);
-
-            if ($response->failed()) {
-                \Log::error('Failed to find invoice ID' . $response);
-                throw FailedException::forInvoiceCreate('Unable to fetch invoice Id');
-            }
-
-            $invoice = $response->json()['QueryResponse']['Invoice'][0];
-            Log::info('Invoice created successfully for user:' . $this->user_id);
-            $pdf_url = $this->base_url . '/v3/company/' . $invoice_config['businessId'] . '/invoice/' . $invoice['Id'] . '/pdf';
-            return  [
-                'success' => true,
-                'data' => [
-                    'invoiceNumber' => $invoice['DocNumber'],
-                    'id' => $invoice['Id'],
-                    'viewUrl' => '',
-                    'pdfUrl' => $pdf_url,
-                    'status' => $this->getInvoiceStatus($invoice['EmailStatus'])
                 ]
-            ];
-        } catch (\QuickBooksOnline\API\Exception\ServiceException $err) {
-            $parsed = $this->parseQuickBooksError($err->getMessage());
-            throw FailedException::forInvoiceCreate($parsed['message'] ?? $err->getMessage(), 422);
-        } catch (\Throwable $th) {
-            \Log::error($th);
-            throw FailedException::forInvoiceCreate("Something went wrong!", 400);
-        }
-    }
-    private function parseQuickBooksError(string $rawMessage): array
-    {
-        $result = [
-            'http_status' => null,
-            'fault_type'  => null,
-            'error_code'  => null,
-            'message'     => null,
-            'detail'      => null,
+            ],
+
+            'CustomerRef' => [
+                'value' => $input['customer_id'],
+            ],
+            'BillEmail' => [
+                'Address' => $input['billing_address']
+            ],
+            'CustomerMemo' => $message,
+            'AllowOnlineCreditCardPayment' => true,
+            'AllowOnlineACHPayment' => true
         ];
 
-        // Pull out HTTP response code, e.g. "Response Code:[400]"
-        if (preg_match('/Response Code:\s*\[(\d+)\]/', $rawMessage, $m)) {
-            $result['http_status'] = (int) $m[1];
+        if (isset($input['invoice_number'])) {
+            $variables['DocNumber'] = $input['invoice_number'];
         }
+        $invoice = Invoice::create($variables);
+        $resultingInvoice = $this->dataService->Add($invoice);
+        $error = $this->dataService->getLastError();
+        if ($error) {
 
-        // Pull out the embedded XML: "with body: [<?xml ... </IntuitResponse>]"
-        if (preg_match('/with body:\s*\[(<\?xml.*?<\/IntuitResponse>)\]/s', $rawMessage, $m)) {
-            $xmlString = html_entity_decode($m[1]);
-
-            libxml_use_internal_errors(true);
-            $xml = simplexml_load_string($xmlString);
-
-            if ($xml !== false && isset($xml->Fault)) {
-                $fault = $xml->Fault;
-                $result['fault_type'] = (string) $fault['type'];
-
-                if (isset($fault->Error)) {
-                    $error = $fault->Error;
-                    $result['error_code'] = (string) $error['code'];
-                    $result['message']    = (string) $error->Message;
-                    $result['detail']     = (string) $error->Detail;
-                }
+            Log::error('failed to create invoice for job:' . $input['job']['id'], ['_trace' => $error]);
+            Log::error('failed to create invoice for user:' . $this->user_id, ['_trace' => $error]);
+            if ($error->getHttpStatusCode() == 401) {
+                (new AuthorizeQuickbooks(config('invoice-gateways.quickbooks')))->refreshToken();
+                throw UnauthenticatedException::forInvoiceCreate();
             }
-        }
 
-        return $result;
+            $error = $this->parseXMLToJSON($error->getResponseBody());
+            throw FailedException::forInvoiceCreate($error['Fault']['Error']['Detail'], 422);
+        }
+        Log::info('Invoice created successfully for user:' . $this->user_id);
+        $invoice_config = $this->populateConfigFromDb();
+        $pdf_url = $this->base_url . '/v3/company/' . $invoice_config['businessId'] . '/invoice/' . $resultingInvoice->Id . '/pdf';
+
+        return  [
+            'success' => true,
+            'data' => [
+                'invoiceNumber' => $resultingInvoice->DocNumber,
+                'id' => $resultingInvoice->Id,
+                'viewUrl' => '',
+                'pdfUrl' => $pdf_url,
+                'status' => $this->getInvoiceStatus($resultingInvoice->EmailStatus)
+            ]
+        ];
     }
 
     /**
      * Create invoice and save it in draft.
      */
-    public function createAndSend($input = []) {}
+    public function createAndSend($input = [])
+    {
+    }
 
     /**
      * Update draft invoice.
      */
-    public function update($input = []) {}
+    public function update($input = [])
+    {
+    }
 
     /**
      * Send invoice to the customer via email.
@@ -219,18 +160,16 @@ class Quickbooks implements InvoiceContract
     public function send($input = [])
     {
 
-        
-        $invoice_config = $this->populateConfigFromDb();
-        $url = "{$this->base_url}/v3/company/{$invoice_config['businessId']}/invoice/{$input['invoice_id']}/send";
-
-        $response = Http::withToken($invoice_config['access_token'])->withHeaders([
-            'Content-Type' => 'application/octet-stream'
-        ])->post($url);
-
-        if($response->failed()) {
-            \Log::error(['failed to send invoice' => $response->json()]);
-            throw FailedException::forInvoiceSend('Something went wrong! Failed to send invoice.');
+        $invoice = $this->dataService->FindById('Invoice', $input['invoice_id']);
+        $error = $this->dataService->getLastError();
+        if ($error) {
+            Log::error('failed to send invoice for user_id:' . $this->user_id, ["__trace" => $error]);
+            (new AuthorizeQuickbooks(config('invoice-gateways.quickbooks')))->refreshToken();
+            request()->session()->flash('message', 'Something went wrong, Invoice couldn\'t be sent. Try again');
+            throw FailedException::forInvoiceSend();
         }
+
+        $this->dataService->SendEmail($invoice);
         Log::info('Quickbooks Invoice sent successfully for user_id:' . $this->user_id);
         request()->session()->flash('message', 'Invoice sent successfully.');
 
@@ -242,74 +181,54 @@ class Quickbooks implements InvoiceContract
      */
     public function delete($input = [])
     {
-        try {
-            // $invoice = $this->dataService->FindById('Invoice', $input['invoice_id']);
-            // $error = $this->dataService->getLastError();
+        $invoice = $this->dataService->FindById('Invoice', $input['invoice_id']);
+        $error = $this->dataService->getLastError();
 
-            // \Log::info($invoice);
-            // if ($error) {
-            //     if ($error->getHttpStatusCode() == 401) {
-            //         (new AuthorizeQuickbooks(config('invoice-gateways.quickbooks')))->refreshToken();
-            //         throw UnauthenticatedException::forInvoiceDelete();
-            //     }
-
-            //     throw FailedException::forInvoiceDelete();
-            // }
-
-
-            $invoice_config = $this->populateConfigFromDb();
-            $url =  "{$this->base_url}/v3/company/{$invoice_config['businessId']}/query";
-            $invoice_id = $input['invoice_id'];
-            $query = "SELECT * FROM Invoice WHERE Id = '{$invoice_id}'";
-            $response = Http::withToken($invoice_config['access_token'])->withHeaders([
-                'Accept' => 'application/json'
-            ])->get($url, [
-                'query' => $query,
-                'minorversion' => self::API_VERSION
-            ]);
-
-            if ($response->failed()) {
-                if ($response->getHttpStatusCode() == 401) {
-                    (new AuthorizeQuickbooks(config('invoice-gateways.quickbooks')))->refreshToken();
-                    throw UnauthenticatedException::forInvoiceDelete();
-                }
-
-                throw FailedException::forInvoiceDelete();
+        if ($error) {
+            if ($error->getHttpStatusCode() == 401) {
+                (new AuthorizeQuickbooks(config('invoice-gateways.quickbooks')))->refreshToken();
+                throw UnauthenticatedException::forInvoiceDelete();
             }
-            $invoice = $response->json()['QueryResponse']['Invoice'][0];
-            $variables = [
-                'Id' => $invoice['Id'],
-                'SyncToken' => $invoice['SyncToken'],
-            ];
-
-            $response = Http::withToken($invoice_config['access_token'])
-            ->withHeaders([
-                'Accept' => 'application/json'
-            ])
-            ->post($this->base_url . '/v3/company/' . $invoice_config['businessId'] . '/invoice?operation=delete', $variables);
-            if ($response->failed()) {
-
-                Log::error('failed to delete invoice for user_id:' . $this->user_id, ["__trace" => $response->body()]);
-                throw FailedException::forInvoiceDelete();
-            }
-
-            Log::info('Quickbooks Invoice deleted successfully for user_id:' . $this->user_id);
-            request()->session()->flash('message', 'Invoice deleted successfully.');
-
-            return ['success' => true];
-        } catch (\Throwable $th) {
-            \Log::info($th);
-            throw $th;
+            throw FailedException::forInvoiceDelete();
         }
+        $invoice_config = $this->populateConfigFromDb();
+        $variables = [
+            'Id' => $invoice->Id,
+            'SyncToken' => $invoice->SyncToken,
+            'Line' => [
+                [
+                    "Amount" => $input['price'],
+                    'DetailType' => "SalesItemLineDetail",
+                    "SalesItemLineDetail" => [
+                        "ItemRef" => [
+                            "value" => $invoice->Line[0]->SalesItemLineDetail->ItemRef
+
+                        ]
+                    ]
+                ]
+            ],
+        ];
+
+        $response = Http::withToken($invoice_config['access_token'])->post($this->base_url . '/v3/company/' . $invoice_config['businessId'] . '/invoice?operation=delete', $variables);
+        if ($response->failed()) {
+            Log::error('failed to delete invoice for user_id:' . $this->user_id, ["__trace" => $error]);
+            throw FailedException::forInvoiceDelete();
+        }
+
+        Log::info('Quickbooks Invoice deleted successfully for user_id:' . $this->user_id);
+        request()->session()->flash('message', 'Invoice deleted successfully.');
+
+        return ['success' => true];
     }
 
 
     public function createCustomer($input = [])
     {
+        $invoice_config = InvoiceGatewayModel::whereUserId(auth()->id())->first();
         $display_name = $input['DisplayName'];
-
+        
         $vendor_query = "SELECT * from Vendor WHERE DisplayName='{$display_name}'";
-
+        
         $vendor_query_result = $this->dataService->Query($vendor_query);
         $error = $this->dataService->getLastError();
         if ($error) {
@@ -322,102 +241,95 @@ class Quickbooks implements InvoiceContract
         $employee_query = "SELECT * FROM Employee WHERE DisplayName = '{$display_name}'";
         $employee_query_result = $this->dataService->Query($employee_query);
         $error = $this->dataService->getLastError();
-        if ($error) {
-            if ($error->getHttpStatusCode() == 401) {
+        if($error) {
+            if($error->getHttpStatusCode() == 401) {
                 (new AuthorizeQuickbooks(config('invoice-gateways.quickbooks')))->refreshToken();
             }
             throw FailedException::forInvoiceCreate('Something went wrong when checking for employee record');
         }
-        if (!empty($employee_query_result) && is_array($employee_query_result)) {
+        if(!empty($employee_query_result) && is_array($employee_query_result)) {
             $customer_query = "SELECT * FROM Customer WHERE DisplayName = '{$display_name}'";
             $customer_query_result = $this->dataService->Query($customer_query);
 
-            if (!empty($customer_query_result) && is_array($customer_query_result)) {
+            if(!empty($customer_query_result) && is_array($customer_query_result)) {
                 $customer_result = $customer_query_result[0];
                 return [
                     'id' => $customer_result->Id,
                 ];
-            } else {
+            }
+            else {
                 $input['DisplayName'] .=  '(C)';
             }
         }
 
-        if (!empty($vendor_query_result) && is_array($vendor_query_result)) {
+        if(!empty($vendor_query_result) && is_array($vendor_query_result)) {
             $customer_query = "SELECT * FROM Customer WHERE DisplayName = '{$display_name}'";
             $customer_query_result = $this->dataService->Query($customer_query);
 
-            if (!empty($customer_query_result) && is_array($customer_query_result)) {
+            if(!empty($customer_query_result) && is_array($customer_query_result)) {
                 $customer_result = $customer_query_result[0];
                 return [
                     'id' => $customer_result->Id,
                 ];
-            } else {
+            }
+            else {
                 $input['DisplayName'] .=  '(C)';
             }
         }
-        $customer = Customer::create($input);
-        $resultingCustomer = $this->dataService->Add($customer);
-        $error = $this->dataService->getLastError();
-        if ($error) {
-            if ($error->getHttpStatusCode() == 401) {
-                (new AuthorizeQuickbooks(config('invoice-gateways.quickbooks')))->refreshToken();
+            $customer = Customer::create($input);
+            $resultingCustomer = $this->dataService->Add($customer);
+            $error = $this->dataService->getLastError();
+            if ($error) {
+                if ($error->getHttpStatusCode() == 401) {
+                    (new AuthorizeQuickbooks(config('invoice-gateways.quickbooks')))->refreshToken();
+                }
+                throw FailedException::forInvoiceCreate();
             }
-            throw FailedException::forInvoiceCreate();
-        }
 
         return [
             'id' => $resultingCustomer->Id
         ];
+        
     }
 
-    public function createProduct($input = [], $invoice_number = null)
+    public function createProduct($input = [], $invoice_number)
     {
-        try {
-            $invoice_config = $this->populateConfigFromDb();
-            $account_id = $invoice_config['incomeAccountId'] ?? '';
-            if (empty($account_id)) {
-                $account_id = $this->getAccountId();
-            }
-
-            $variables = [
-                'Name' => $input['description'],
-                'Type' => 'Service',
-                'UnitPrice' => $input['amount'] ?? 1,
-                'IncomeAccountRef' => [
-                    'value' => $account_id
-                ]
-            ];
-
-            $item = Item::create($variables);
-            $itemObj = $this->dataService->Add($item);
-            $error = $this->dataService->getLastError();
-
-            if ($error) {
-                $message = null;
-                Log::info($error->getHttpStatusCode());
-                Log::error('failed to create product for user_id:' . $this->user_id, ['_trace' => $error->getResponseBody()]);
-                Log::info(['message' => $message, 'input_message' => $input['message']]);
-                if ($error->getHttpStatusCode() == 401) {
-                    (new AuthorizeQuickbooks(config('invoice-gateways.quickbooks')))->refreshToken();
-                    throw UnauthenticatedException::forInvoiceCreate();
-                } elseif ($error->getHttpStatusCode() == 400) {
-                    $message = $input['message'] ?? 'QuickBooks (QB) requires a unique job name for every new invoice created via VOICEOVERVIEW. To continue from VOV, please update the Job Title for this invoice. Or you can create a new invoice via QB by selecting the line item already created.';
-                }
-
-                throw FailedException::forProductCreate($message, 422);
-            }
-
-            return [
-                'id' => $itemObj->Id
-            ];
-        } catch (\QuickBooksOnline\API\Exception\ServiceException $err) {
-            $parsed = $this->parseQuickBooksError($err->getMessage());
-            throw FailedException::forInvoiceCreate($parsed['message'] ?? $err->getMessage(), 422);
-        } catch (\Throwable $th) {
-            \Log::debug(['file' => __FILE__, 'line' => __LINE__]);
-            \Log::error($th);
-            throw FailedException::forInvoiceCreate("Something went wrong!", 400);
+        $account_id = $invoice_config['incomeAccountId'] ?? '';
+        if (empty($account_id)) {
+            $account_id = $this->getAccountId();
         }
+
+        $variables = [
+            'Name' => $input['description'],
+            'Type' => 'Service',
+            'UnitPrice' => $input['amount'] ?? 1,
+            'IncomeAccountRef' => [
+                'value' => $account_id
+            ]
+        ];
+
+        $item = Item::create($variables);
+        $itemObj = $this->dataService->Add($item);
+        $error = $this->dataService->getLastError();
+
+        if ($error) {
+            $message = null;
+            Log::info($error->getHttpStatusCode());
+            Log::error('failed to create product for user_id:' . $this->user_id, ['_trace' => $error->getResponseBody()]);
+            Log::info(['message' => $message, 'input_message' => $input['message']]);
+            if ($error->getHttpStatusCode() == 401) {
+                (new AuthorizeQuickbooks(config('invoice-gateways.quickbooks')))->refreshToken();
+                throw UnauthenticatedException::forInvoiceCreate();
+            } elseif ($error->getHttpStatusCode() == 400) {
+                $message = $input['message'] ?? 'QuickBooks (QB) requires a unique job name for every new invoice created via VOICEOVERVIEW. To continue from VOV, please update the Job Title for this invoice. Or you can create a new invoice via QB by selecting the line item already created.';
+            }
+
+            throw FailedException::forProductCreate($message, 422);
+        }
+
+        return [
+            'id' => $itemObj->Id
+        ];
     }
 
 
@@ -450,15 +362,14 @@ class Quickbooks implements InvoiceContract
 
             throw FailedException::forAccountId();
         }
-        
+
         if ($response->ok()) {
             Log::info('account id retrived successfully for user_id:' . $this->user_id);
-            $result = $response->json();
-            if (!empty($result['QueryResponse'])) {
-                $user_invoice_config['incomeAccountId'] = $result['QueryResponse']['Account'][0]['Id'];
+            if (!empty($array['QueryResponse'])) {
+                $user_invoice_config['incomeAccountId'] = $array['QueryResponse']['Account']['Id'];
                 $invoice_config->update(['config' => $user_invoice_config]);
-                
-                return $result['QueryResponse']['Account'][0]['Id'];
+
+                return $array['QueryResponse']['Account']['Id'];
             }
         }
 
@@ -544,6 +455,7 @@ class Quickbooks implements InvoiceContract
             return $allCustomers;
         } catch (\Throwable $th) {
             throw FailedException::forCustomerAll();
+
         }
     }
 
@@ -558,43 +470,24 @@ class Quickbooks implements InvoiceContract
         }
     }
 
-    private function findInvoice($invoice_id) {
-            $invoice_config = $this->populateConfigFromDb();
-            // THIS PIECE OF CODE WAS ADDED SINCE CREATE INVOICE DID NOT RETURNED ANY INVOICE ID
-            $url =  "{$this->base_url}/v3/company/{$invoice_config['businessId']}/query";
-            $query = "SELECT * FROM Invoice WHERE id= '{$invoice_id}'";
-            $response = Http::withToken($invoice_config['access_token'])->withHeaders([
-                'Accept' => 'application/json'
-            ])->get($url, [
-                'query' => $query,
-                'minorversion' => self::API_VERSION
-            ]);
-              if ($response->failed()) {
-                \Log::error('Failed to find invoice ID' . $response);
-                throw FailedException::forInvoiceCreate('Unable to fetch invoice Id');
-            }
-            $invoice = $response->json()['QueryResponse']['Invoice'][0];
-            $invoice['ID'] = $invoice['Id'];
-            return ($invoice);
-    }
-
     public function downloadInvoice($invoice_id)
     {
-        $invoice_config = $this->populateConfigFromDb();
-        $url =  "{$this->base_url}/v3/company/{$invoice_config['businessId']}/invoice/{$invoice_id}/pdf";
-        $response = Http::withToken($invoice_config['access_token'])->withHeaders([
-            'Content-Type' => 'application/pdf'
-        ])->get($url, [
-            'minorversion' => 75
-        ]);
-        Log::info('account id retrived successfully for user_id:' . $this->user_id);
-        if($response->failed()) {
-            $message = $this->parseQuickBooksError($response->body());
-            throw FailedException::forInvoiceDownload($message['message']);
+        $invoice = $this->dataService->FindById('Invoice', $invoice_id);
+        $error = $this->dataService->getLastError();
+
+        if ($error) {
+            Log::error('Failed to download invoice for user_id:' . $this->user_id, ['__trace' => $error]);
+            if ($error->getHttpStatusCode() == 401) {
+                (new AuthorizeQuickbooks(config('invoice-gateways.quickbooks')))->refreshToken();
+                $this->downloadInvoice($invoice_id);
+                throw UnauthenticatedException::forInvoiceDownload();
+            }
+            throw FailedException::forInvoiceDownload();
         }
 
-        return $response->body();
-        
+        $result = $this->dataService->DownloadPDF($invoice);
+        Log::info('account id retrived successfully for user_id:' . $this->user_id);
+        return $result;
     }
 
     private function populateConfigFromDb()
@@ -649,7 +542,9 @@ class Quickbooks implements InvoiceContract
         }
     }
 
-    public function getProductDetail($item_id) {}
+    public function getProductDetail($item_id)
+    {
+    }
 
     public function createPayment($totalAmt, $customerRef)
     {
